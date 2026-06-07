@@ -5,7 +5,7 @@ from collections.abc import Generator
 import base64
 import json
 import copy
-import Services.chatbot.llama_utils as utils_llama
+import EnabledModules.chatbot.llama_utils as utils_llama
 
 SERVER_VERSION_MIN: int = 170000
 SERVER_VERSION_MAX: int = 9999999
