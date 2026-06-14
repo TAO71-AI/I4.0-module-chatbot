@@ -307,11 +307,14 @@ def StringToChatHandler(
     
     Returns:
         CH_Llava15 | None
+    
+    > [!WARNING]
+    > The use of this function is not recommended anymore. Use the generic MTMD chat handler instead by passing the `mmproj_path` argument to the Llama model.
     """
     # Lower the chat handler name
     chatHandler = ChatHandler.lower()
     generalArgs = {
-        "clip_model_path": Mmproj,
+        "mmproj_path": Mmproj,
         "image_min_tokens": ImageTokens[0],
         "image_max_tokens": ImageTokens[1]
     } | ExtraArgs
@@ -788,7 +791,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     # Save the parameters in a dictionary
     modelParamsLCPP = {
         "model_path": modelPath,
-        "clip_model_path": mmproj,
+        "mmproj_path": mmproj,
         "chat_handler_kwargs": chatHandlerKwargs,
         "n_gpu_layers": gpuLayers,
         "cpu_moe": cpuMoE,

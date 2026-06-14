@@ -2,6 +2,7 @@
 import logging
 from typing import Any
 from collections.abc import Generator
+import re
 import base64
 import json
 import copy
@@ -93,95 +94,58 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
     tools = UserConfig["tools"] if ("tools" in UserConfig and ServiceConfiguration["tools"]["modified_by_user"]) else []
     toolChoice = UserConfig["tool_choice"] if ("tool_choice" in UserConfig and ServiceConfiguration["tool_choice"]["modified_by_user"]) else "auto" if (len(tools) > 0) else "none"
     maxLength = UserConfig["max_length"] if ("max_length" in UserConfig and ServiceConfiguration["max_length"]["modified_by_user"]) else __models__[Name]["max_length"] if ("max_length" in __models__[Name]) else ServiceConfiguration["max_length"]["default"]
-    stopTokens = UserConfig["stop_tokens"] if ("stop_tokens" in UserConfig) else UserConfig["stop"] if ("stop" in UserConfig) else []
+    stopTokens = UserConfig.get("stop_tokens", UserConfig.get("stop", []))
     stopTokens = [str(s) for s in stopTokens] if (isinstance(stopTokens, list)) else [str(stopTokens)]
-    extraParameters = __models__[Name]["_private_extra_parameters"] if ("_private_extra_parameters" in __models__[Name]) else {}
+    extraParameters = __models__[Name].get("_private_extra_parameters", {})
     
     if (maxLength > ServiceConfiguration["max_length"]["default"] and not ServiceConfiguration["max_length"]["allow_greater_than_default"]):
         maxLength = ServiceConfiguration["max_length"]["default"]
     
-    extraModelCTParams = {}
-    extraHandlerCTParams = {}
+    extraChatTemplateParams = __models__[Name].get("_private_chat_template_params", {})
+    startToken = None
+    endToken = None
+    modes = __models__[Name].get("modes", {})
+    userModes = UserConfig.get("modes", None)
 
-    if ("extra_chat_template_parameters" in ServiceConfiguration):
-        for pn, pv in ServiceConfiguration["extra_chat_template_parameters"]["parameters"].items():
-            if (pv["type"] == "base" or pv["type"] == "model"):
-                extraModelCTParams[pn] = pv["value"]
-            elif (pv["type"] == "mmproj" or pv["type"] == "handler"):
-                extraHandlerCTParams[pn] = pv["value"]
-            else:
-                raise ValueError("Invalid extra parameter type.")
+    if (isinstance(userModes, str)):
+        userModes = [userModes]
+    elif (not isinstance(userModes, list)):
+        if (userModes is not None):
+            yield {"warnings": ["Specified mode type is not valid. Setting to default."]}
         
-    if ("extra_chat_template_parameters" in __models__[Name]):
-        for pn, pv in __models__[Name]["extra_chat_template_parameters"].items():
-            if (pv["type"] == "base" or pv["type"] == "model"):
-                extraModelCTParams[pn] = pv["value"]
-            elif (pv["type"] == "mmproj" or pv["type"] == "handler"):
-                extraHandlerCTParams[pn] = pv["value"]
+        userModes = __models__[Name].get("default_modes", [])
+
+    for modeName, modeParams in modes.items():
+        if (modeName not in userModes):
+            continue
+
+        for paramName, paramValue in modeParams.items():
+            if (paramName == "conflicts"):
+                if (isinstance(paramValue, str)):
+                    paramValue = [paramValue]
+                elif (not isinstance(paramValue, list)):
+                    logging.warning("[service_chatbot] Invalid mode param value. Ignoring.")
+                    continue
+                
+                for conflictsModes in paramValue:
+                    if (conflictsModes in userModes):
+                        raise ValueError("Conflict in modes.")
+            elif (paramName in ["chat_template_params", "_private_chat_template_params"]):
+                if (not isinstance(paramValue, dict)):
+                    logging.warning("[service_chatbot] Invalid mode param value. Ignoring.")
+                    continue
+
+                for ctParamName, ctParamValue in paramValue.items():
+                    extraChatTemplateParams[ctParamName] = ctParamValue
+            elif (paramName in ["start_token", "_private_start_token"]):
+                startToken = paramValue
+            elif (paramName in ["end_token", "_private_end_token"]):
+                endToken = paramValue
             else:
-                raise ValueError("Invalid extra parameter type.")
-    
-    if ("template_parameters" in UserConfig and ServiceConfiguration["extra_chat_template_parameters"]["modified_by_user"]):
-        for pn, pv in UserConfig["template_parameters"].items():
-            if (
-                ((pv["type"] == "base" or pv["type"] == "model") and pn not in extraModelCTParams) or
-                ((pv["type"] == "mmproj" or pv["type"] == "handler") and pn not in extraHandlerCTParams)
-            ):
-                yield {"warnings": [f"Tried to pass an invalid parameter ({pn}). Parameter ignored."]}
+                logging.warning("[service_chatbot] Unknown mode param. Ignoring.")
                 continue
-            
-            if (pv["type"] == "base" or pv["type"] == "model"):
-                extraModelCTParams[pn] = pv["value"]
-            elif (pv["type"] == "mmproj" or pv["type"] == "handler"):
-                extraHandlerCTParams[pn] = pv["value"]
-            else:
-                yield {"warnings": [f"Invalid parameter type for {pn}. Parameter ignored."]}
-                continue
 
-    startsThinking = "starts_thinking" in __models__[Name]["reasoning"] and __models__[Name]["reasoning"]["starts_thinking"]
-    generatesStartToken = "generates_start_token" in __models__[Name]["reasoning"] and __models__[Name]["reasoning"]["generates_start_token"]
-
-    if ("reasoning_mode" in UserConfig and "reasoning" in __models__[Name] and "levels" in __models__[Name]["reasoning"] and UserConfig["reasoning_mode"] in __models__[Name]["reasoning"]["levels"]):
-        if ("_private_model_params" in __models__[Name]["reasoning"] and UserConfig["reasoning_mode"] in __models__[Name]["reasoning"]["_private_model_params"]):
-            for pn, pv in __models__[Name]["reasoning"]["_private_model_params"][UserConfig["reasoning_mode"]].items():
-                if (pn == "starts_thinking"):
-                    startsThinking = pv
-                elif (pn == "generates_start_token"):
-                    generatesStartToken = pv
-                else:
-                    extraParameters[pn] = pv
-        
-        if ("_private_model_template" in __models__[Name]["reasoning"] and UserConfig["reasoning_mode"] in __models__[Name]["reasoning"]["_private_model_template"]):
-            for pn, pv in __models__[Name]["reasoning"]["_private_model_template"][UserConfig["reasoning_mode"]].items():
-                if (pv["type"] == "base" or pv["type"] == "model"):
-                    extraModelCTParams[pn] = pv["value"]
-                elif (pv["type"] == "mmproj" or pv["type"] == "handler"):
-                    extraHandlerCTParams[pn] = pv["value"]
-                else:
-                    raise ValueError("Invalid extra parameter type.")
-        
-        if ("model_params" in __models__[Name]["reasoning"] and UserConfig["reasoning_mode"] in __models__[Name]["reasoning"]["model_params"]):
-            for pn, pv in __models__[Name]["reasoning"]["model_params"][UserConfig["reasoning_mode"]].items():
-                if (pn == "starts_thinking"):
-                    startsThinking = pv
-                elif (pn == "generates_start_token"):
-                    generatesStartToken = pv
-                else:
-                    extraParameters[pn] = pv
-        
-        if ("model_template" in __models__[Name]["reasoning"] and UserConfig["reasoning_mode"] in __models__[Name]["reasoning"]["model_template"]):
-            for pn, pv in __models__[Name]["reasoning"]["model_template"][UserConfig["reasoning_mode"]].items():
-                if (pv["type"] == "base" or pv["type"] == "model"):
-                    extraModelCTParams[pn] = pv["value"]
-                elif (pv["type"] == "mmproj" or pv["type"] == "handler"):
-                    extraHandlerCTParams[pn] = pv["value"]
-                else:
-                    raise ValueError("Invalid extra parameter type.")
-    
-    continueGeneration = UserConfig["continue_generation"] if ("continue_generation" in UserConfig) else None
-
-    if (continueGeneration is None):
-        continueGeneration = conversation[-1]["role"] == "assistant"
+    continueGeneration = conversation[-1]["role"] == "assistant"
     
     generator = InferenceModel(
         Name,
@@ -202,11 +166,10 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
             "tool_choice": toolChoice,
             "max_length": maxLength,
             "stop": stopTokens,
+            "start_token": startToken,
+            "end_token": endToken,
+            "chat_template_params": extraChatTemplateParams,
             "extra_parameters": extraParameters,
-            "extra_template_parameters_model": extraModelCTParams,
-            "extra_template_parameters_handler": extraHandlerCTParams,
-            "reasoning_starts_thinking": startsThinking,
-            "reasoning_generates_start_token": generatesStartToken,
             "continue_generation": continueGeneration
         }
     )
@@ -273,46 +236,31 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     
     tools = []
     currentToolIdx = None
+    toolStartToken = __models__[Name].get("tool_start_token", ServiceConfiguration["tool_start_token"])
+    toolEndToken = __models__[Name].get("tool_end_token", ServiceConfiguration["tool_end_token"])
 
-    if ("tool_start_token" in __models__[Name]):
-        toolStartToken = __models__[Name]["tool_start_token"]
-    elif ("tool_start_token" in ServiceConfiguration):
-        toolStartToken = ServiceConfiguration["tool_start_token"]
-    else:
-        toolStartToken = "<tool_call>"
-    
-    if ("tool_end_token" in __models__[Name]):
-        toolEndToken = __models__[Name]["tool_end_token"]
-    elif ("tool_end_token" in ServiceConfiguration):
-        toolEndToken = ServiceConfiguration["tool_end_token"]
-    else:
-        toolEndToken = "</tool_call>"
+    defaultChannel = __models__[Name].get("channel_default", ServiceConfiguration["channel_default"])
+    channelStartToken = __models__[Name].get("channel_start_token", ServiceConfiguration["channel_start_token"])
+    channelEndToken = __models__[Name].get("channel_end_token", ServiceConfiguration["channel_end_token"])
+    channelNameEndToken = __models__[Name].get("channel_name_end_token", ServiceConfiguration["channel_name_end_token"])
+    channelName = defaultChannel
+    prevChannelName = channelName
+    settingChannelName = False
 
     fullAssistantText = ""
     firstToken = True
-    isThinking = Configuration["reasoning_starts_thinking"]
-    reasoningStartToken = __models__[Name]["reasoning"]["start_token"] if ("reasoning" in __models__[Name] and "start_token" in __models__[Name]["reasoning"]) else None
-    reasoningEndToken = __models__[Name]["reasoning"]["end_token"] if ("reasoning" in __models__[Name] and "end_token" in __models__[Name]["reasoning"]) else None
-
-    if (reasoningStartToken is None):
-        reasoningStartToken = ServiceConfiguration["reasoning_start_token"]
-    
-    if (reasoningEndToken is None):
-        reasoningEndToken = ServiceConfiguration["reasoning_end_token"]
+    startToken = Configuration["start_token"]
+    endToken = Configuration["end_token"]
 
     if (__models__[Name]["_private_type"] == "lcpp"):
         model: utils_llama.Llama = __models__[Name]["_private_model"]
-        prevModelChatTemplateArgs = None
         prevChatHandlerTemplateArgs = None
 
-        for pn, pv in Configuration["extra_template_parameters_model"].items():
+        if (model.chat_handler is None):
             pass  # TODO
-
-        if (model.chat_handler is not None):
+        else:
             prevChatHandlerTemplateArgs = copy.deepcopy(model.chat_handler.extra_template_arguments)
-
-            for pn, pv in Configuration["extra_template_parameters_handler"].items():
-                model.chat_handler.extra_template_arguments[pn] = pv
+            model.chat_handler.extra_template_arguments |= Configuration["chat_template_params"]
 
         response = model.create_chat_completion(
             messages = modelConversation,
@@ -335,111 +283,166 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
             assistant_prefill = Configuration["continue_generation"] and ServiceConfiguration["allow_assistant_prefill"],
             **Configuration["extra_parameters"]
         )
+    
+    try:
+        if (startToken is not None):
+            yield {"text": startToken}
 
-        try:
-            for token in response:
-                if (
-                    not "choices" in token or
-                    len(token["choices"]) == 0 or
-                    not "delta" in token["choices"][0] or
-                    not "content" in token["choices"][0]["delta"]
-                ):
+        for token in response:
+            tokenText = ""
+
+            if (__models__[Name]["_private_type"] == "lcpp"):
+                if ("choices" not in token or len(token["choices"]) == 0 or "delta" not in token["choices"][0] or "content" not in token["choices"][0]["delta"]):
                     continue
 
-                tokenText = token["choices"][0]["delta"]["content"]
-                fullAssistantText += tokenText
+            tokenText: str = token["choices"][0]["delta"]["content"]
+            fullAssistantText += tokenText
 
-                if (toolEndToken in tokenText and currentToolIdx is not None):
-                    tools[currentToolIdx] += tokenText[:tokenText.index(toolEndToken)]
-                    currentToolIdx = None
+            if (settingChannelName):
+                if (channelNameEndToken is None or channelNameEndToken in tokenText):
+                    channelName += tokenText[:tokenText.index(channelNameEndToken)] if (channelNameEndToken is not None) else __models__[Name].get("channel_null_name", ServiceConfiguration["channel_null_name"])
+                    settingChannelName = False
 
-                if (toolStartToken in tokenText and currentToolIdx is None):
-                    currentToolIdx = len(tools)
-                    tools.append(tokenText[tokenText.index(toolStartToken) + len(toolStartToken):])
-                elif (currentToolIdx is not None):
-                    tools[currentToolIdx] += tokenText
-                
-                if (firstToken and isThinking and not Configuration["reasoning_generates_start_token"]):
-                    yield {"text": reasoningStartToken, "extra": {"thinking": isThinking}}
-
-                if (not isThinking and fullAssistantText.strip().endswith(reasoningStartToken)):
-                    isThinking = True
-
-                firstToken = False
-                yield {"text": tokenText, "extra": {"thinking": isThinking}}
-
-                if (isThinking and fullAssistantText.strip().endswith(reasoningEndToken)):
-                    isThinking = False
-            
-            parsedTools = []
-            toolsType = __models__[Name]["tool_parse_type"] if ("tool_parse_type" in __models__[Name]) else None
-
-            if (toolsType is None):
-                if (model.metadata["general.architecture"] in ["qwen35moe", "qwen35"]):
-                    toolsType = "xml-1"
+                    if (channelName != prevChannelName):
+                        yield {"text": __handle_channel_change__(Name, prevChannelName, channelName)}
+                    
+                    prevChannelName = channelName
                 else:
-                    toolsType = "json-1"
-            
-            if (toolsType in ["json", "json-1"]):
-                parsedTools = [json.loads(tool) for tool in tools]
-            elif (toolsType in ["xml", "xml-1", "qwen3.5"]):
-                for tool in tools:
-                    toolName = tool.strip()
-                    toolName = toolName[toolName.index("<function"):]
-                    toolName = toolName[toolName.index("=") + 1:].strip()
-
-                    if (toolName.startswith("\"")):
-                        toolName = toolName[1:toolName.index("\"")]
-                    elif (toolName.startswith("\'")):
-                        toolName = toolName[1:toolName.index("\'")]
-                    else: 
-                        toolName = toolName[:toolName.index(">")]
-
-                    toolName = toolName.strip()
-
-                    toolParams = tool[tool.index(toolName) + len(toolName):].strip()
-                    toolParams = toolParams[toolParams.index(">") + 1:toolParams.index("</function>")].strip()
-                    toolParams = toolParams.split("<parameter")[1:] if ("<parameter" in toolParams) else []
-
-                    paramsParsed = {}
-
-                    for param in toolParams:
-                        paramName = param.strip()
-                        paramName = paramName[paramName.index("=") + 1:].strip()
-
-                        if (paramName.startswith("\"")):
-                            paramName = paramName[1:paramName.index("\"")]
-                        elif (paramName.startswith("\'")):
-                            paramName = paramName[1:paramName.index("\'")]
-                        else:
-                            paramName = paramName[:paramName.index(">")]
-
-                        paramName = paramName.strip()
-
-                        paramValue = param[param.index(paramName) + len(paramName):].strip()
-                        paramValue = paramValue[paramValue.index(">") + 1:paramValue.index("</parameter>")].strip()
-
-                        try:
-                            paramValue = json.loads(paramValue)
-                        except json.JSONDecodeError:
-                            paramValue = str(paramValue)
-
-                        paramsParsed[paramName] = paramValue
-
-                    parsedTools.append({"name": toolName, "arguments": paramsParsed})
-            else:
-                raise ValueError("Invalid tools parser.")
-            
-            yield {"extra": {"tools": parsedTools}}
-        finally:
-            if (prevModelChatTemplateArgs is not None):
-                pass  # TODO
+                    channelName += tokenText
                 
-            if (prevChatHandlerTemplateArgs is not None):
-                model.chat_handler.extra_template_arguments = prevChatHandlerTemplateArgs
+                continue
+
+            if (channelStartToken in tokenText):
+                textBeforeToken = tokenText[:tokenText.index(channelStartToken)]
+
+                if (len(textBeforeToken) > 0):
+                    yield {"text": textBeforeToken, "extra": {"channel": prevChannelName}}
+                
+                prevChannelName = channelName
+                channelName = tokenText[tokenText.index(channelStartToken) + len(channelStartToken):]
+                settingChannelName = True
+
+                continue
             
-            if ("_private_delete_kv_cache" not in __models__[Name] or __models__[Name]["_private_delete_kv_cache"]):
+            if (channelEndToken in tokenText):
+                if (channelName != defaultChannel):
+                    yield {"text": __handle_channel_change__(Name, channelName, prevChannelName)}
+                
+                channelName = defaultChannel
+                prevChannelName = channelName
+
+                continue
+
+            if (toolEndToken in tokenText and currentToolIdx is not None):
+                tools[currentToolIdx] += tokenText[:tokenText.index(toolEndToken)]
+                currentToolIdx = None
+
+            if (toolStartToken in tokenText and currentToolIdx is None):
+                currentToolIdx = len(tools)
+                tools.append(tokenText[tokenText.index(toolStartToken) + len(toolStartToken):])
+            elif (currentToolIdx is not None):
+                tools[currentToolIdx] += tokenText
+
+            firstToken = False
+            yield {"text": tokenText, "extra": {"channel": channelName}}
+        
+        if (endToken is not None):
+            yield {"text": endToken}
+    finally:
+        if (__models__[Name]["_private_type"] == "lcpp"):
+            if (prevChatHandlerTemplateArgs is not None):
+                if (model.chat_handler is None):
+                    pass  # TODO
+                else:
+                    model.chat_handler.extra_template_arguments = prevChatHandlerTemplateArgs
+                    prevChatHandlerTemplateArgs = None
+            
+            if ("_private_delete_kv_cache" in __models__[Name] and __models__[Name]["_private_delete_kv_cache"]):
                 utils_llama.ClearLlamaCache(model)
+
+    parsedTools = []
+    toolsType = __models__[Name].get("tool_parse_type", None)
+
+    if (toolsType is None):
+        if (model.metadata["general.architecture"] in ["qwen35moe", "qwen35"]):
+            toolsType = "qwen3.5"
+        elif (model.metadata["general.architecture"] in ["diffusion-gemma", "gemma4"]):
+            toolsType = "gemma4"
+        else:
+            toolsType = "json-1"
+    
+    if (toolsType in ["json", "json-1"]):
+        parsedTools = [json.loads(tool) for tool in tools]
+    elif (toolsType in ["xml", "xml-1", "qwen3.5"]):
+        for tool in tools:
+            toolName = tool.strip()
+            toolName = toolName[toolName.index("<function"):]
+            toolName = toolName[toolName.index("=") + 1:].strip()
+
+            if (toolName.startswith("\"")):
+                toolName = toolName[1:toolName.index("\"")]
+            elif (toolName.startswith("\'")):
+                toolName = toolName[1:toolName.index("\'")]
+            else: 
+                toolName = toolName[:toolName.index(">")]
+
+            toolName = toolName.strip()
+
+            toolParams = tool[tool.index(toolName) + len(toolName):].strip()
+            toolParams = toolParams[toolParams.index(">") + 1:toolParams.index("</function>")].strip()
+            toolParams = toolParams.split("<parameter")[1:] if ("<parameter" in toolParams) else []
+
+            paramsParsed = {}
+
+            for param in toolParams:
+                paramName = param.strip()
+                paramName = paramName[paramName.index("=") + 1:].strip()
+
+                if (paramName.startswith("\"")):
+                    paramName = paramName[1:paramName.index("\"")]
+                elif (paramName.startswith("\'")):
+                    paramName = paramName[1:paramName.index("\'")]
+                else:
+                    paramName = paramName[:paramName.index(">")]
+
+                paramName = paramName.strip()
+
+                paramValue = param[param.index(paramName) + len(paramName):].strip()
+                paramValue = paramValue[paramValue.index(">") + 1:paramValue.index("</parameter>")].strip()
+
+                try:
+                    paramValue = json.loads(paramValue)
+                except json.JSONDecodeError:
+                    paramValue = str(paramValue)
+
+                paramsParsed[paramName] = paramValue
+            
+            parsedTools.append({"name": toolName, "arguments": paramsParsed})
+    elif (toolsType in ["gemma4", "gemma-4", "diffusion-gemma", "diffusion-gemma-1"]):
+        for tool in tools:
+            globalPattern = r"^call:([a-zA-Z0-9_-]+)\s*\{(.+)\}$"
+            coincide = re.match(globalPattern, tool.strip(), re.IGNORECASE | re.DOTALL)
+
+            toolName = coincide.group(1)
+            toolContent = coincide.group(2)
+
+            argsPattern = r"([a-zA-Z0-9_-]+)\s*:\s*<\|\"\|>(.*?)<\|\"\|>"
+            argsFound = re.findall(argsPattern, toolContent)
+            paramsParsed = {}
+
+            for paramName, paramStr in argsFound:
+                paramStr = paramStr.strip()
+
+                try:
+                    paramsParsed[paramName] = json.loads(paramStr)
+                except json.JSONDecodeError:
+                    paramsParsed[paramName] = str(paramStr)
+
+            parsedTools.append({"name": toolName, "arguments": paramsParsed})
+    else:
+        raise ValueError("Invalid tools parser.")
+
+    yield {"extra": {"tools": parsedTools}}
 
 def LoadModel(Name: str, Configuration: dict[str, Any]) -> None:
     """
@@ -510,3 +513,19 @@ def LoadModel(Name: str, Configuration: dict[str, Any]) -> None:
                 testInferenceResponse += token["text"]
         
         logging.info(f"[service_chatbot] Test inference response for model `{Name}`:\n```markdown\n{testInferenceResponse}\n```")
+
+def __handle_channel_change__(ModelName: str, FromChannel: str, ToChannel: str) -> str:
+    token = __models__[ModelName].get("channel_change_token", ServiceConfiguration["channel_change_token"])
+
+    if (token is None):
+        return
+    
+    if (isinstance(token, str)):
+        return token
+    elif (isinstance(token, dict) and FromChannel in token):
+        if (isinstance(token[FromChannel], str)):
+            return token[FromChannel]
+        elif (isinstance(token[FromChannel], dict) and "to" in token[FromChannel]):
+            return token[FromChannel].get(token[FromChannel]["to"], "\n")
+    
+    return ""
