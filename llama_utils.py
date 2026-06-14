@@ -23,44 +23,7 @@ from llama_cpp import (
     LLAMA_POOLING_TYPE_UNSPECIFIED as POOLING_UNSPECIFIED,
 
     # Ftypes
-    LLAMA_FTYPE_ALL_F32 as FTYPE_F32,
-    LLAMA_FTYPE_MOSTLY_BF16 as FTYPE_BF16,
-    LLAMA_FTYPE_MOSTLY_F16 as FTYPE_F16,
-    LLAMA_FTYPE_MOSTLY_Q8_0 as FTYPE_Q8_0,
-    LLAMA_FTYPE_MOSTLY_Q6_K as FTYPE_Q6_K,
-    LLAMA_FTYPE_MOSTLY_Q5_K_M as FTYPE_Q5_K_M,
-    LLAMA_FTYPE_MOSTLY_Q5_K_S as FTYPE_Q5_K_S,
-    LLAMA_FTYPE_MOSTLY_Q4_K_M as FTYPE_Q4_K_M,
-    LLAMA_FTYPE_MOSTLY_Q4_K_S as FTYPE_Q4_K_S,
-    LLAMA_FTYPE_MOSTLY_Q3_K_L as FTYPE_Q3_K_L,
-    LLAMA_FTYPE_MOSTLY_Q3_K_M as FTYPE_Q3_K_M,
-    LLAMA_FTYPE_MOSTLY_Q3_K_S as FTYPE_Q3_K_S,
-    LLAMA_FTYPE_MOSTLY_Q2_K as FTYPE_Q2_K,
-
-    LLAMA_FTYPE_MOSTLY_Q5_1 as FTYPE_Q5_1,
-    LLAMA_FTYPE_MOSTLY_Q5_0 as FTYPE_Q5_0,
-    LLAMA_FTYPE_MOSTLY_Q4_1 as FTYPE_Q4_1,
-    LLAMA_FTYPE_MOSTLY_Q4_0 as FTYPE_Q4_0,
-    LLAMA_FTYPE_MOSTLY_Q1_0 as FTYPE_Q1_0,
-
-    LLAMA_FTYPE_MOSTLY_IQ1_S as FTYPE_IQ1_S,
-    LLAMA_FTYPE_MOSTLY_IQ1_M as FTYPE_IQ1_M,
-    LLAMA_FTYPE_MOSTLY_TQ1_0 as FTYPE_TQ1_0,
-    LLAMA_FTYPE_MOSTLY_IQ2_XXS as FTYPE_IQ2_XXS,
-    LLAMA_FTYPE_MOSTLY_IQ2_XS as FTYPE_IQ2_XS,
-    LLAMA_FTYPE_MOSTLY_IQ2_S as FTYPE_IQ2_S,
-    LLAMA_FTYPE_MOSTLY_IQ2_M as FTYPE_IQ2_M,
-    LLAMA_FTYPE_MOSTLY_Q2_K_S as FTYPE_Q2_K_S,
-    LLAMA_FTYPE_MOSTLY_TQ2_0 as FTYPE_TQ2_0,
-    LLAMA_FTYPE_MOSTLY_IQ3_XXS as FTYPE_IQ3_XXS,
-    LLAMA_FTYPE_MOSTLY_IQ3_XS as FTYPE_IQ3_XS,
-    LLAMA_FTYPE_MOSTLY_IQ3_S as FTYPE_IQ3_S,
-    LLAMA_FTYPE_MOSTLY_IQ3_M as FTYPE_IQ3_M,
-    LLAMA_FTYPE_MOSTLY_IQ4_XS as FTYPE_IQ4_XS,
-    LLAMA_FTYPE_MOSTLY_IQ4_NL as FTYPE_IQ4_NL,
-
-    LLAMA_FTYPE_MOSTLY_MXFP4_MOE as FTYPE_MXFP4,
-    LLAMA_FTYPE_MOSTLY_NVFP4 as FTYPE_NVFP4,
+    llama_ftype,
 
     # Other
     llama_get_memory,
@@ -88,44 +51,45 @@ from typing import Any
 import time
 
 __FTYPES__: dict[str | tuple[str, ...], int] = {
-    ("f32", "fp32"): FTYPE_F32,
-    "bf16": FTYPE_BF16,
-    ("f16", "fp16"): FTYPE_F16,
-    "q8_0": FTYPE_Q8_0,
-    "q6_k": FTYPE_Q6_K,
-    ("q5_k_m", "q5_k"): FTYPE_Q5_K_M,
-    "q5_k_s": FTYPE_Q5_K_S,
-    ("q4_k_m", "q4_k"): FTYPE_Q4_K_M,
-    "q4_k_s": FTYPE_Q4_K_S,
-    "q3_k_l": FTYPE_Q3_K_L,
-    ("q3_k_m", "q3_k"): FTYPE_Q3_K_M,
-    "q3_k_s": FTYPE_Q3_K_S,
-    "q2_k": FTYPE_Q2_K,
+    ("f32", "fp32"): llama_ftype.LLAMA_FTYPE_ALL_F32,
+    "bf16": llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
+    ("f16", "fp16"): llama_ftype.LLAMA_FTYPE_MOSTLY_F16,
+    "q8_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q8_0,
+    "q6_k": llama_ftype.LLAMA_FTYPE_MOSTLY_Q6_K,
+    ("q5_k_m", "q5_k"): llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_K_M,
+    "q5_k_s": llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_K_S,
+    ("q4_k_m", "q4_k"): llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_K_M,
+    "q4_k_s": llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_K_S,
+    "q3_k_l": llama_ftype.LLAMA_FTYPE_MOSTLY_Q3_K_L,
+    ("q3_k_m", "q3_k"): llama_ftype.LLAMA_FTYPE_MOSTLY_Q3_K_M,
+    "q3_k_s": llama_ftype.LLAMA_FTYPE_MOSTLY_Q3_K_S,
+    "q2_k": llama_ftype.LLAMA_FTYPE_MOSTLY_Q2_K,
+    "q2_k_s": llama_ftype.LLAMA_FTYPE_MOSTLY_Q2_K_S,
 
-    "q5_1": FTYPE_Q5_1,
-    "q5_0": FTYPE_Q5_0,
-    "q4_1": FTYPE_Q4_1,
-    "q4_0": FTYPE_Q4_0,
-    "q1_0": FTYPE_Q1_0,
+    "q5_1": llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
+    "q5_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0,
+    "q4_1": llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
+    "q4_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0,
+    "q1_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q1_0,
 
-    "iq1_s": FTYPE_IQ1_S,
-    "iq1_m": FTYPE_IQ1_M,
-    "tq1_0": FTYPE_TQ1_0,
-    "iq2_xxs": FTYPE_IQ2_XXS,
-    "iq2_xs": FTYPE_IQ2_XS,
-    "iq2_s": FTYPE_IQ2_S,
-    "iq2_m": FTYPE_IQ2_M,
-    "q2_k_s": FTYPE_Q2_K_S,
-    "tq2_0": FTYPE_TQ2_0,
-    "iq3_xxs": FTYPE_IQ3_XXS,
-    "iq3_xs": FTYPE_IQ3_XS,
-    "iq3_s": FTYPE_IQ3_S,
-    "iq3_m": FTYPE_IQ3_M,
-    "iq4_xs": FTYPE_IQ4_XS,
-    "iq4_nl": FTYPE_IQ4_NL,
+    "tq1_0": llama_ftype.LLAMA_FTYPE_MOSTLY_TQ1_0,
+    "tq2_0": llama_ftype.LLAMA_FTYPE_MOSTLY_TQ2_0,
 
-    ("mxfp4", "mxfp4_moe", "mxfp4moe"): FTYPE_MXFP4,
-    "nvfp4": FTYPE_NVFP4
+    "iq1_s": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ1_S,
+    "iq1_m": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ1_M,
+    "iq2_xxs": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ2_XXS,
+    "iq2_xs": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ2_XS,
+    "iq2_s": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ2_S,
+    "iq2_m": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ2_M,
+    "iq3_xxs": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ3_XXS,
+    "iq3_xs": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ3_XS,
+    "iq3_s": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ3_S,
+    "iq3_m": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ3_M,
+    "iq4_xs": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_XS,
+    "iq4_nl": llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL,
+
+    ("mxfp4", "mxfp4_moe", "mxfp4moe"): llama_ftype.LLAMA_FTYPE_MOSTLY_MXFP4_MOE,
+    "nvfp4": llama_ftype.LLAMA_FTYPE_MOSTLY_NVFP4
 }
 __SPLIT_MODES__: dict[str | tuple[str, ...], int] = {
     "layer": llama_split_mode.LLAMA_SPLIT_MODE_LAYER,
@@ -711,7 +675,10 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         ftypeK = StringToFtype(ftypeK)
 
         if (ftypeK is None or ftypeK not in [
-            FTYPE_F32, FTYPE_F16, FTYPE_BF16, FTYPE_Q8_0, FTYPE_Q4_0, FTYPE_Q4_1, FTYPE_IQ4_NL, FTYPE_Q5_0, FTYPE_Q5_1
+            llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
+            llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
+            llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
+            llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
         ]):
             ftypeK = None
             logging.warning("[llama_utils] `ftype_k` not found or invalid. Set to None.")
@@ -729,7 +696,10 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         ftypeV = StringToFtype(ftypeV)
 
         if (ftypeV is None or ftypeV not in [
-            FTYPE_F32, FTYPE_F16, FTYPE_BF16, FTYPE_Q8_0, FTYPE_Q4_0, FTYPE_Q4_1, FTYPE_IQ4_NL, FTYPE_Q5_0, FTYPE_Q5_1
+            llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
+            llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
+            llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
+            llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
         ]):
             ftypeV = None
             logging.warning("[llama_utils] `ftype_v` not found or invalid. Set to None.")
