@@ -152,16 +152,16 @@ def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any] | t
     return Default
 
 def StringToFtype(Ftype: str | None) -> int | None:
-    return __get_value_from_dictionary__(Ftype, __FTYPES__, None)
+    return __get_value_from_dictionary__(Ftype, __FTYPES__, None)[0]
 
 def StringToSplitMode(SplitMode: str | None) -> int | None:
-    return __get_value_from_dictionary__(SplitMode, __SPLIT_MODES__, llama_split_mode.LLAMA_SPLIT_MODE_LAYER)
+    return __get_value_from_dictionary__(SplitMode, __SPLIT_MODES__, llama_split_mode.LLAMA_SPLIT_MODE_LAYER)[0]
 
 def StringToRopeScalingType(RopeScalingType: str | None) -> int | None:
-    return __get_value_from_dictionary__(RopeScalingType, __ROPE_SCALING_TYPES__, llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED)
+    return __get_value_from_dictionary__(RopeScalingType, __ROPE_SCALING_TYPES__, llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED)[0]
 
 def StringToPoolingType(PoolingType: str | None) -> int | None:
-    return __get_value_from_dictionary__(PoolingType, __POOLING_TYPES__, POOLING_UNSPECIFIED)
+    return __get_value_from_dictionary__(PoolingType, __POOLING_TYPES__, POOLING_UNSPECIFIED)[0]
 
 def StringToCacheType(CacheType: str | None, CapacityInBytes: int = 2 ^ 30) -> LlamaDiskCache | LlamaRAMCache | None:
     """
@@ -183,13 +183,13 @@ def StringToCacheType(CacheType: str | None, CapacityInBytes: int = 2 ^ 30) -> L
     return None
 
 def StringToAttnType(AttnType: str | None) -> int:
-    return __get_value_from_dictionary__(AttnType, __ATTN_TYPES__, llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED)
+    return __get_value_from_dictionary__(AttnType, __ATTN_TYPES__, llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED)[0]
 
 def StringToFlashAttnType(FlashAttnType: str | None) -> int:
-    return __get_value_from_dictionary__(FlashAttnType, __FLASH_ATTN_TYPES__, llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO)
+    return __get_value_from_dictionary__(FlashAttnType, __FLASH_ATTN_TYPES__, llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO)[0]
 
 def StringToCtxType(CtxType: str | None) -> int:
-    return __get_value_from_dictionary__(CtxType, __CTX_TYPES__, llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT)
+    return __get_value_from_dictionary__(CtxType, __CTX_TYPES__, llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT)[0]
 
 def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     """
