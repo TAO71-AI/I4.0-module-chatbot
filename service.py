@@ -106,6 +106,7 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
     endToken = None
     modes = __models__[Name].get("modes", {})
     userModes = UserConfig.get("modes", None)
+    defaultChannel = None
 
     if (isinstance(userModes, str)):
         userModes = [userModes]
