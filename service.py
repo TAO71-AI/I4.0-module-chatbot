@@ -141,6 +141,8 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
                 startToken = paramValue
             elif (paramName in ["end_token", "_private_end_token"]):
                 endToken = paramValue
+            elif (paramName == "start_channel"):
+                defaultChannel = paramValue
             else:
                 logging.warning("[service_chatbot] Unknown mode param. Ignoring.")
                 continue
@@ -170,7 +172,8 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
             "end_token": endToken,
             "chat_template_params": extraChatTemplateParams,
             "extra_parameters": extraParameters,
-            "continue_generation": continueGeneration
+            "continue_generation": continueGeneration,
+            "default_channel": defaultChannel
         }
     )
 
@@ -239,13 +242,16 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     toolStartToken = __models__[Name].get("tool_start_token", ServiceConfiguration["tool_start_token"])
     toolEndToken = __models__[Name].get("tool_end_token", ServiceConfiguration["tool_end_token"])
 
-    defaultChannel = __models__[Name].get("channel_default", ServiceConfiguration["channel_default"])
+    defaultChannel = Configuration.get("default_channel", None)
     channelStartToken = __models__[Name].get("channel_start_token", ServiceConfiguration["channel_start_token"])
     channelEndToken = __models__[Name].get("channel_end_token", ServiceConfiguration["channel_end_token"])
     channelNameEndToken = __models__[Name].get("channel_name_end_token", ServiceConfiguration["channel_name_end_token"])
     channelName = defaultChannel
     prevChannelName = channelName
     settingChannelName = False
+
+    if (defaultChannel is None):
+        defaultChannel = __models__[Name].get("channel_default", ServiceConfiguration["channel_default"])
 
     fullAssistantText = ""
     firstToken = True
