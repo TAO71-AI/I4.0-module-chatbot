@@ -218,16 +218,14 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
 
                 if (__models__[Name]["_private_type"] == "lcpp"):
                     if (content["type"] == "image"):
-                        content["image_url"] = {"url": f"data:image;base64,{content['image']}"}
-
-                        content["type"] = "image_url"
-                        content.pop("image")
+                        content["image"] = f"data:image;base64,{content['image']}"
                     elif (content["type"] == "audio"):
-                        content["audio_url"] = {"url": f"data:audio;base64,{content['audio']}"}
-
-                        content["type"] = "audio_url"
-                        content.pop("audio")
-                    # TODO: Add video when supported
+                        content["audio"] = f"data:audio;base64,{content['audio']}"
+                    elif (content["type"] == "video"):
+                        content["video"] = f"data:video;base64,{content['video']}"
+                    elif (content["type"] != "text"):
+                        yield {"warnings": ["Unsupported media type, will be ignored."]}
+                        continue
             
             if (txt is not None):
                 message["content"] = txt
