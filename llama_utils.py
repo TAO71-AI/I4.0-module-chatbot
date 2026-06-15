@@ -14,6 +14,13 @@ from llama_cpp import (
     # ROPE scaling types
     llama_rope_scaling_type,
 
+    # Attention types
+    llama_attention_type,
+    llama_flash_attn_type,
+
+    # Context types
+    llama_context_type,
+
     # Pooling types
     LLAMA_POOLING_TYPE_CLS as POOLING_CLS,
     LLAMA_POOLING_TYPE_MEAN as POOLING_MEAN,
@@ -28,24 +35,6 @@ from llama_cpp import (
     # Other
     llama_get_memory,
     llama_memory_seq_rm
-)
-from llama_cpp.llama_chat_format import (
-    Llava15ChatHandler as CH_Llava15,
-    Llava16ChatHandler as CH_Llava16,
-    MoondreamChatHandler as CH_Moondream,
-    NanoLlavaChatHandler as CH_NanoLlava,
-    Llama3VisionAlphaChatHandler as CH_Llama3VisionAlpha,
-    MiniCPMv26ChatHandler as CH_MiniCPMv26,
-    Qwen25VLChatHandler as CH_Qwen25VL,
-    Qwen3VLChatHandler as CH_Qwen3VL,
-    Qwen35ChatHandler as CH_Qwen35,
-    Gemma3ChatHandler as CH_Gemma3,
-    Gemma4ChatHandler as CH_Gemma4,
-    ObsidianChatHandler as CH_Obsidian,
-    MiniCPMv45ChatHandler as CH_MiniCPMv45,
-    GraniteDoclingChatHandler as CH_GraniteDocling,
-    LFM25VLChatHandler as CH_LFM25VL,
-    LFM2VLChatHandler as CH_LFM2VL
 )
 from typing import Any
 import time
@@ -113,8 +102,26 @@ __POOLING_TYPES__: dict[str | tuple[str, ...], int] = {
     "rank": POOLING_RANK,
     "unspecified": POOLING_UNSPECIFIED
 }
+__ATTN_TYPES__: dict[str | tuple[str, ...], int] = {
+    "casual": llama_attention_type.LLAMA_ATTENTION_TYPE_CAUSAL,
+    ("non_casual", "non-casual", "non casual"): llama_attention_type.LLAMA_ATTENTION_TYPE_NON_CAUSAL,
+    "unspecified": llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED
+}
+__FLASH_ATTN_TYPES__: dict[str | tuple[str, ...], int] = {
+    ("auto", "automatic"): llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO,
+    "enabled": llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_ENABLED,
+    "disabled": llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_DISABLED
+}
+__CTX_TYPES__: dict[str, tuple[str, ...], int] = {
+    "default": llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT,
+    "mtp": llama_context_type.LLAMA_CONTEXT_TYPE_MTP
+}
 
-def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any], Any], Default: Any | None = None) -> tuple[Any, int] | (Any | None):
+def ClearLlamaCache(Model: Llama) -> None:
+    kv = llama_get_memory(Model.ctx)
+    llama_memory_seq_rm(kv, -1, -1, -1)
+
+def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any] | tuple[Any, ...], Any], Default: Any | None = None) -> tuple[Any, int] | (Any | None):
     """
     Retrieves the value associated with a key in a dictionary, where the keys can be either a single object or a list of possible keys.
 
@@ -144,95 +151,19 @@ def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any], An
     # Key not found, return the default value
     return Default
 
-def StringToFtype(Ftype: str) -> int | None:
-    """
-    Converts a string (ftype name) into an integer value.
+def StringToFtype(Ftype: str | None) -> int | None:
+    return __get_value_from_dictionary__(Ftype, __FTYPES__, None)
 
-    Args:
-        Ftype (str): The ftype name.
-    
-    Returns:
-        int | None
-    """
-    # Lower the ftype name
-    ftype = Ftype.lower()
+def StringToSplitMode(SplitMode: str | None) -> int | None:
+    return __get_value_from_dictionary__(SplitMode, __SPLIT_MODES__, llama_split_mode.LLAMA_SPLIT_MODE_LAYER)
 
-    # Get the value ftype
-    ftypeResult = __get_value_from_dictionary__(ftype, __FTYPES__, None)
+def StringToRopeScalingType(RopeScalingType: str | None) -> int | None:
+    return __get_value_from_dictionary__(RopeScalingType, __ROPE_SCALING_TYPES__, llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED)
 
-    # Return the value ftype
-    if (ftypeResult is not None):
-        return ftypeResult[0]
-    
-    return ftypeResult
+def StringToPoolingType(PoolingType: str | None) -> int | None:
+    return __get_value_from_dictionary__(PoolingType, __POOLING_TYPES__, POOLING_UNSPECIFIED)
 
-def StringToSplitMode(SplitMode: str) -> int | None:
-    """
-    Converts a string (split mode name) into an integer value.
-
-    Args:
-        SplitMode (str): The split mode name.
-    
-    Returns:
-        int | None
-    """
-    # Lower the split mode name
-    spm = SplitMode.lower()
-
-    # Get the value split mode
-    spmResult = __get_value_from_dictionary__(spm, __SPLIT_MODES__, None)
-
-    # Return the value split mode
-    if (spmResult is not None):
-        return spmResult[0]
-    
-    return spmResult
-
-def StringToRopeScalingType(RopeScalingType: str) -> int | None:
-    """
-    Converts a string (rope scaling type name) into an integer value.
-
-    Args:
-        RopeScalingType (str): The rope scaling type name.
-    
-    Returns:
-        int | None
-    """
-    # Lower the rope scaling type name
-    rst = RopeScalingType.lower()
-
-    # Get the value rope scaling type
-    rstResult = __get_value_from_dictionary__(rst, __ROPE_SCALING_TYPES__, None)
-
-    # Return the value rope scaling type
-    if (rstResult is not None):
-        return rstResult[0]
-    
-    return rstResult
-
-def StringToPoolingType(PoolingType: str) -> int | None:
-    """
-    Converts a string (pooling type name) into an integer value.
-
-    Args:
-        PoolingType (str): The pooling type name.
-    
-    Returns:
-        int | None
-    """
-    # Lower the pooling type name
-    pooling = PoolingType.lower()
-
-    # Get the value pooling type
-    poolingResult = __get_value_from_dictionary__(pooling, __POOLING_TYPES__, None)
-
-    # Return the value pooling type
-    if (poolingResult is not None):
-        return poolingResult[0]
-    
-    return poolingResult
-
-def StringToCacheType(CacheType: str, CapacityInBytes: int = 2 ^ 30) -> LlamaDiskCache | LlamaRAMCache | None:
+def StringToCacheType(CacheType: str | None, CapacityInBytes: int = 2 ^ 30) -> LlamaDiskCache | LlamaRAMCache | None:
     """
     Converts a string (cache type name) into a class.
 
@@ -243,94 +174,22 @@ def StringToCacheType(CacheType: str, CapacityInBytes: int = 2 ^ 30) -> LlamaDis
     Returns:
         LlamaDiskCache | LlamaRAMCache | None
     """
-    # Lower the cache type name
-    cache = CacheType.lower()
-
     # Get and return the cache type
-    if (cache == "disk"):
+    if (CacheType == "disk"):
         return LlamaDiskCache(capacity_bytes = CapacityInBytes)
-    elif (cache == "ram"):
+    elif (CacheType == "ram"):
         return LlamaRAMCache(capacity_bytes = CapacityInBytes)
     
     return None
 
-def StringToChatHandler(
-    ChatHandler: str,
-    Mmproj: str,
-    ImageTokens: tuple[int, int],
-    **ExtraArgs: dict[str, Any]
-) -> CH_Llava15 | None:
-    """
-    Converts a string (chat handler name) into a class.
+def StringToAttnType(AttnType: str | None) -> int:
+    return __get_value_from_dictionary__(AttnType, __ATTN_TYPES__, llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED)
 
-    Args:
-        ChatHandler (str): The chat handler name.
-        Mmproj (str): Path to the MMPROJ file.
-        UseGPU (bool): Use the GPU for the mmproj.
-        ImageTokens (tuple[int, int]): Min and max image tokens.
-    
-    Returns:
-        CH_Llava15 | None
-    
-    > [!WARNING]
-    > The use of this function is not recommended anymore. Use the generic MTMD chat handler instead by passing the `mmproj_path` argument to the Llama model.
-    """
-    # Lower the chat handler name
-    chatHandler = ChatHandler.lower()
-    generalArgs = {
-        "mmproj_path": Mmproj,
-        "image_min_tokens": ImageTokens[0],
-        "image_max_tokens": ImageTokens[1]
-    } | ExtraArgs
+def StringToFlashAttnType(FlashAttnType: str | None) -> int:
+    return __get_value_from_dictionary__(FlashAttnType, __FLASH_ATTN_TYPES__, llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO)
 
-    if (ImageTokens[1] < ImageTokens[0] and ImageTokens[1] > -1):
-        raise ValueError("[llama_utils] `mmproj_max_image_tokens` can't be less than `mmproj_min_image_tokens`.")
-
-    # Get and return the chat handler
-    if (chatHandler == "llava15"):
-        return CH_Llava15(**generalArgs)
-    elif (chatHandler == "llava16"):
-        return CH_Llava16(**generalArgs)
-    elif (chatHandler in ["llama3visionalpha", "llama-3-vision-alpha", "llama3-vision-alpha"]):
-        return CH_Llama3VisionAlpha(**generalArgs)
-    elif (chatHandler in ["minicpmv2.6", "mini-cpm-v2.6"]):
-        return CH_MiniCPMv26(**generalArgs)
-    elif (chatHandler == "moondream"):
-        return CH_Moondream(**generalArgs)
-    elif (chatHandler == "nanollava"):
-        return CH_NanoLlava(**generalArgs)
-    elif (chatHandler in ["qwen2.5vl", "qwen2.5-vl"]):
-        return CH_Qwen25VL(**generalArgs)
-    elif (chatHandler in ["qwen3vl", "qwen3-vl"]):
-        if (ImageTokens[0] < 1024):
-            logging.warning("[llama_utils] For Qwen3-VL it's recommended to set `mmproj_min_image_tokens` to 1024.")
-
-        return CH_Qwen3VL(**generalArgs)
-    elif (chatHandler in ["qwen35", "qwen3.5", "qwen3.6"]):
-        if (ImageTokens[0] < 1024):
-            logging.warning("[llama_utils] For Qwen3.5 it's recommended to set `mmproj_min_image_tokens` to 1024.")
-        
-        return CH_Qwen35(**generalArgs)
-    elif (chatHandler == "gemma3"):
-        return CH_Gemma3(**generalArgs)
-    elif (chatHandler == "obsidian"):
-        return CH_Obsidian(**generalArgs)
-    elif (chatHandler in ["minicpmv4.5", "minicpmv45", "minicpm45"]):
-        return CH_MiniCPMv45(**generalArgs)
-    elif (chatHandler == "granitedocling"):
-        return CH_GraniteDocling(**generalArgs)
-    elif (chatHandler in ["lfm25vl", "lfm2.5-vl"]):
-        return CH_LFM25VL(**generalArgs)
-    elif (chatHandler in ["lfm2vl", "lfm2-vl"]):
-        return CH_LFM2VL(**generalArgs)
-    elif (chatHandler in ["gemma4", "gemma-4"]):
-        return CH_Gemma4(**generalArgs)
-
-    return None
-
-def ClearLlamaCache(Model: Llama) -> None:
-    kv = llama_get_memory(Model.ctx)
-    llama_memory_seq_rm(kv, -1, -1, -1)
+def StringToCtxType(CtxType: str | None) -> int:
+    return __get_value_from_dictionary__(CtxType, __CTX_TYPES__, llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT)
 
 def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     """
@@ -342,412 +201,160 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     Returns:
         dict[str, Llama | Any]
     """
-    # Get all the verbose parameters
-    verbose = Configuration["_private_verbose"] if ("_private_verbose" in Configuration) else False
-    mmprojVerbose = Configuration["_private_mmproj_verbose"] if ("_private_mmproj_verbose" in Configuration) else False
+    # Get verbose parameters
+    verbose = Configuration.get("_private_verbose", False)
+    mmprojVerbose = Configuration.get("_private_mmproj_verbose", False)
 
-    if (not isinstance(verbose, bool)):
-        raise AttributeError("[llama_utils] Invalid `_private_verbose`.")
+    # Get model path (and mmproj if provided)
+    modelPathConfig = Configuration.get("_private_model_path", {})
     
-    if (not isinstance(mmprojVerbose, bool)):
-        raise AttributeError("[llama_utils] Invalid `_private_mmproj_verbose`.")
-
-    # Get the model path (and mmproj if provided)
-    if ("_private_model_path" in Configuration):
-        modelPath = None
+    if (isinstance(modelPathConfig, dict)):
+        modelPath = modelPathConfig.get("llm", None)
+        mmproj = modelPathConfig.get("mmproj", None)
+    else:
+        modelPath = str(modelPathConfig)
         mmproj = None
-        chatHandlerKwargs = {}
-
-        logging.info("[llama_utils] Checking model path.")
-
-        if (isinstance(Configuration["_private_model_path"], dict)):
-            if ("llm" in Configuration["_private_model_path"]):
-                modelPath = Configuration["_private_model_path"]["llm"]
-            elif ("base" in Configuration["_private_model_path"]):
-                modelPath = Configuration["_private_model_path"]["base"]
-            
-            if ("mmproj" in Configuration["_private_model_path"]):
-                mmproj = Configuration["_private_model_path"]["mmproj"]
-        elif (isinstance(Configuration["_private_model_path"], str)):
-            modelPath = Configuration["_private_model_path"]
-        
-        if (not isinstance(modelPath, str)):
-            raise AttributeError("[llama_utils] Invalid `_private_model_path`.")
-        
-        if (not isinstance(mmproj, str) and mmproj is not None):
-            raise AttributeError("[llama_utils] Invalid `mmproj`.")
-        
-        mmprojGPU = Configuration["_private_mmproj_use_gpu"] if ("_private_mmproj_use_gpu" in Configuration) else True
-
-        if (not isinstance(mmprojGPU, bool)):
-            raise AttributeError("[llama_utils] Invalid `_private_mmproj_use_gpu`.")
-        
-        minImageTokens = Configuration["mmproj_min_image_tokens"] if ("mmproj_min_image_tokens" in Configuration) else -1
-        maxImageTokens = Configuration["mmproj_max_image_tokens"] if ("mmproj_max_image_tokens" in Configuration) else -1
-
-        if (not isinstance(minImageTokens, int)):
-            raise AttributeError("[llama_utils] Invalid `mmproj_min_image_tokens`.")
-        
-        if (not isinstance(maxImageTokens, int)):
-            raise AttributeError("[llama_utils] Invalid `mmproj_max_image_tokens`.")
-        
-        if (mmproj is not None):
-            logging.info("[llama_utils] Using automatic/generic chat handler.")
-            chatHandlerKwargs = {
-                "use_gpu": mmprojGPU,
-                "image_min_tokens": minImageTokens,
-                "image_max_tokens": maxImageTokens
-            }
-    else:
-        raise AttributeError("[llama_utils] `_private_model_path` must be in the configuration of the model.")
     
-    # Get the LoRA
-    if ("_private_lora" in Configuration):
-        if ("path" not in Configuration["_private_lora"]):
-            raise ValueError("[llama_utils] Could not load LoRA. No path found.")
-        
-        loraPath = Configuration["_private_lora"]["path"]
-        loraBase = Configuration["_private_lora"]["base_path"] if ("base_path" in Configuration["_private_lora"]) else None
-        loraScale = Configuration["_private_lora"]["scale"] if ("scale" in Configuration["_private_lora"]) else 1
+    # Get mmproj GPU usage
+    mmprojGPU = Configuration.get("_private_mmproj_use_gpu", True)
 
-        if (not isinstance(loraScale, int)):
-            raise AttributeError("[llama_utils] Invalid LoRA scale.")
-    else:
-        loraPath = None
-        loraBase = None
-        loraScale = 1
+    # Get mmproj min and max tokens
+    mmprojMinImageTokens = Configuration.get("mmproj_min_image_tokens", -1)
+    mmprojMaxImageTokens = Configuration.get("mmproj_max_image_tokens", -1)
     
-    # Get the GPU layers
-    if ("_private_gpu_layers" in Configuration):
-        gpuLayers = Configuration["_private_gpu_layers"]
-
-        if (not isinstance(gpuLayers, int)):
-            raise AttributeError("[llama_utils] Invalid `_private_gpu_layers`.")
-    else:
-        gpuLayers = -1
-        logging.info("[llama_utils] `_private_gpu_layers` not defined. Set to -1.")
+    # Get LoRA
+    loraConfig = Configuration.get("_private_lora", {})
+    loraPath = loraConfig.get("path", None)
+    loraBase = loraConfig.get("base_path", None)
+    loraScale = loraConfig.get("scale", 1)
     
-    # Get the split_mode
-    if ("_private_split_mode" in Configuration):
-        splitMode = Configuration["_private_split_mode"]
-
-        if (not isinstance(splitMode, str)):
-            raise AttributeError("[llama_utils] Invalid `_private_split_mode`.")
-        
-        splitMode = StringToSplitMode(splitMode)
-
-        if (splitMode is None):
-            splitMode = llama_split_mode.LLAMA_SPLIT_MODE_LAYER
-            logging.warning("[llama_utils] `_private_split_mode` not found. Set to `layer`.")
-    else:
-        splitMode = llama_split_mode.LLAMA_SPLIT_MODE_LAYER
-        logging.info("[llama_utils] `_private_split_mode` not defined. Set to `layer`.")
+    # Get GPU layers
+    gpuLayers = Configuration.get("_private_gpu_layers", -1)
     
-    # Get the main GPU
-    if ("_private_main_gpu" in Configuration):
-        mainGPU = Configuration["_private_main_gpu"]
-
-        if (not isinstance(mainGPU, int)):
-            raise AttributeError("[llama_utils] Invalid `_private_main_gpu`.")
-    else:
-        mainGPU = 0
-        logging.info("[llama_utils] `_private_main_gpu` not defined. Set to 0.")
+    # Get split mode
+    splitMode = Configuration.get("_private_split_mode", None)
+    splitMode = StringToSplitMode(splitMode)
+    
+    # Get main GPU
+    mainGPU = Configuration.get("_private_main_gpu", 0)
     
     # Get mmap
-    if ("_private_use_mmap" in Configuration):
-        mmap = Configuration["_private_use_mmap"]
-
-        if (not isinstance(mmap, bool)):
-            raise AttributeError("[llama_utils] Invalid `_private_use_mmap`.")
-    else:
-        mmap = True
-        logging.info("[llama_utils] `_private_use_mmap` not defined. Set to True.")
+    mmap = Configuration.get("_private_use_mmap", True)
     
     # Get mlock
-    if ("_private_use_mlock" in Configuration):
-        mlock = Configuration["_private_use_mlock"]
-
-        if (not isinstance(mlock, bool)):
-            raise AttributeError("[llama_utils] Invalid `_private_use_mlock`.")
-    else:
-        mlock = False
-        logging.info("[llama_utils] `_private_use_mlock` not defined. Set to False.")
+    mlock = Configuration.get("_private_use_mlock", False)
     
     # Get ctx
-    if ("ctx" in Configuration):
-        ctx = Configuration["ctx"]
+    ctx = Configuration.get("ctx", 2048)
 
-        if (not isinstance(ctx, int)):
-            raise AttributeError("[llama_utils] Invalid `ctx`.")
-    else:
-        ctx = 2048
-        logging.info("[llama_utils] `ctx` not defined. Set to 2048.")
+    # Get ctx checkpoints
+    ctxCheckpoints = Configuration.get("_private_ctx_checkpoints", 16)
+    ctxCheckpointsInterval = Configuration.get("_private_ctx_checkpoints_interval", 4096)
+    ctxCheckpointsOnDevice = Configuration.get("_private_ctx_checkpoints_on_device", False)
+
+    # Get ctx tyoe
+    ctxType = Configuration.get("_private_ctx_type", None)
+    ctxType = StringToCtxType(ctxType)
     
     # Get batch
-    if ("_private_batch" in Configuration):
-        batch = Configuration["_private_batch"]
-
-        if (not isinstance(batch, int)):
-            raise AttributeError("[llama_utils] Invalid `_private_batch`.")
-    else:
-        batch = 512
-        logging.info("[llama_utils] `_private_batch` not defined. Set to 512.")
+    batch = Configuration.get("_private_batch", 512)
     
     # Get ubatch
-    if ("_private_ubatch" in Configuration):
-        ubatch = Configuration["_private_ubatch"]
-
-        if (not isinstance(ubatch, int)):
-            raise AttributeError("[llama_utils] Invalid `_private_ubatch`.")
-    else:
-        ubatch = 512
-        logging.info("[llama_utils] `_private_ubatch` not defined. Set to 512.")
+    ubatch = Configuration.get("_private_ubatch", 512)
     
     # Get threads
-    if ("_private_threads" in Configuration):
-        threads = Configuration["_private_threads"]
-
-        if (not isinstance(threads, int) and threads is not None):
-            raise AttributeError("[llama_utils] Invalid `_private_threads`.")
-    else:
-        threads = None
-        logging.info("[llama_utils] `_private_threads` not defined. Set to None.")
+    threads = Configuration.get("_private_threads", None)
     
-    # Get batch_threads
-    if ("_private_batch_threads" in Configuration):
-        batchThreads = Configuration["_private_batch_threads"]
-
-        if (not isinstance(batchThreads, int) and batchThreads is not None):
-            raise AttributeError("[llama_utils] Invalid `_private_batch_threads`.")
-    else:
-        batchThreads = None
-        logging.info("[llama_utils] `_private_batch_threads` not defined. Set to None.")
+    # Get batch threads
+    batchThreads = Configuration.get("_private_batch_threads", None)
     
-    # Get rope_scaling_type
-    if ("_private_rope_scaling_type" in Configuration):
-        ropeScalingType = Configuration["_private_rope_scaling_type"]
-
-        if (not isinstance(ropeScalingType, str)):
-            raise AttributeError("[llama_utils] Invalid `_private_rope_scaling_type`.")
-        
-        ropeScalingType = StringToRopeScalingType(ropeScalingType)
-
-        if (ropeScalingType is None):
-            ropeScalingType = llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED
-            logging.warning("[llama_utils] `_private_rope_scaling_type` not found. Set to `unspecified`.")
-    else:
-        ropeScalingType = llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED
-        logging.info("[llama_utils] `_private_rope_scaling_type` not defined. Set to `unspecified`.")
+    # Get rope scaling type
+    ropeScalingType = Configuration.get("_private_rope_scaling_type", None)
+    ropeScalingType = StringToRopeScalingType(ropeScalingType)
     
-    # Get rope_freq_base
-    if ("_private_rope_freq_base" in Configuration):
-        ropeFreqBase = Configuration["_private_rope_freq_base"]
-
-        if (not isinstance(ropeFreqBase, int) and not isinstance(ropeFreqBase, float)):
-            raise AttributeError("[llama_utils] Invalid `_private_rope_freq_base`.")
-    else:
-        ropeFreqBase = 0
-        logging.info("[llama_utils] `_private_rope_freq_base` not defined. Set to 0.")
+    # Get rope freq base
+    ropeFreqBase = Configuration.get("_private_rope_freq_base", 0)
     
-    # Get rope_freq_scale
-    if ("_private_rope_freq_scale" in Configuration):
-        ropeFreqScale = Configuration["_private_rope_freq_scale"]
-
-        if (not isinstance(ropeFreqScale, int) and not isinstance(ropeFreqScale, float)):
-            raise AttributeError("[llama_utils] Invalid `_private_rope_freq_scale`.")
-    else:
-        ropeFreqScale = 0
-        logging.info("[llama_utils] `_private_rope_freq_scale` not defined. Set to 0.")
+    # Get rope freq scale
+    ropeFreqScale = Configuration.get("_private_rope_freq_scale", 0)
     
-    # Get yarn_ext_factor
-    if ("_private_yarn_ext_factor" in Configuration):
-        yarnExtFactor = Configuration["_private_yarn_ext_factor"]
-
-        if (not isinstance(yarnExtFactor, int) and not isinstance(yarnExtFactor, float)):
-            raise AttributeError("[llama_utils] Invalid `_private_yarn_ext_factor`.")
-    else:
-        yarnExtFactor = -1
-        logging.info("[llama_utils] `_private_yarn_ext_factor` not defined. Set to -1.")
+    # Get yarn ext factor
+    yarnExtFactor = Configuration.get("_private_yarn_ext_factor", -1)
     
-    # Get yarn_attn_factor
-    if ("_private_yarn_attn_factor" in Configuration):
-        yarnAttnFactor = Configuration["_private_yarn_attn_factor"]
-
-        if (not isinstance(yarnAttnFactor, int) and not isinstance(yarnAttnFactor, float)):
-            raise AttributeError("[llama_utils] Invalid `_private_yarn_attn_factor`.")
-    else:
-        yarnAttnFactor = 1
-        logging.info("[llama_utils] `_private_yarn_attn_factor` not defined. Set to 1.")
+    # Get yarn attn factor
+    yarnAttnFactor = Configuration.get("_private_yarn_attn_factor", 1)
     
-    # Get yarn_beta_fast
-    if ("_private_yarn_beta_fast" in Configuration):
-        yarnBetaFast = Configuration["_private_yarn_beta_fast"]
-
-        if (not isinstance(yarnBetaFast, int) and not isinstance(yarnBetaFast, float)):
-            raise AttributeError("[llama_utils] Invalid `_private_yarn_beta_fast`.")
-    else:
-        yarnBetaFast = 32
-        logging.info("[llama_utils] `_private_yarn_beta_fast` not defined. Set to 32.")
+    # Get yarn beta fast
+    yarnBetaFast = Configuration.get("_private_yarn_beta_fast", 32)
     
-    # Get yarn_beta_slow
-    if ("_private_yarn_beta_slow" in Configuration):
-        yarnBetaSlow = Configuration["_private_yarn_beta_slow"]
-
-        if (not isinstance(yarnBetaSlow, int) and not isinstance(yarnBetaSlow, float)):
-            raise AttributeError("[llama_utils] Invalid `_private_yarn_beta_slow`.")
-    else:
-        yarnBetaSlow = 1
-        logging.info("[llama_utils] `_private_yarn_beta_slow` not defined. Set to 1.")
+    # Get yarn beta slow
+    yarnBetaSlow = Configuration.get("_private_yarn_beta_slow", 1)
     
-    # Get yarn_orig_ctx
-    if ("_private_yarn_orig_ctx" in Configuration):
-        yarnOrigCtx = Configuration["_private_yarn_orig_ctx"]
-
-        if (not isinstance(yarnOrigCtx, int)):
-            raise AttributeError("[llama_utils] Invalid `_private_yarn_orig_ctx`.")
-    else:
-        yarnOrigCtx = 0
-        logging.info("[llama_utils] `_private_yarn_orig_ctx` not defined. Set to 0.")
+    # Get yarn orig ctx
+    yarnOrigCtx = Configuration.get("_private_yarn_orig_ctx", 0)
     
-    # Get pooling_type
-    if ("_private_pooling_type" in Configuration):
-        poolingType = Configuration["_private_pooling_type"]
-
-        if (not isinstance(poolingType, str)):
-            raise AttributeError("[llama_utils] Invalid `_private_pooling_type`.")
-        
-        poolingType = StringToPoolingType(poolingType)
-
-        if (poolingType is None):
-            poolingType = POOLING_UNSPECIFIED
-            logging.warning("[llama_utils] `_private_pooling_type` not found. Set to `unspecified`.")
-    else:
-        poolingType = POOLING_UNSPECIFIED
-        logging.info("[llama_utils] `_private_pooling_type` not defined. Set to `unspecified`.")
+    # Get pooling type
+    poolingType = Configuration.get("_private_pooling_type")
+    poolingType = StringToPoolingType(poolingType)
     
-    # Get offload_kqv
-    if ("_private_offload_kqv" in Configuration):
-        offloadKqv = Configuration["_private_offload_kqv"]
-
-        if (not isinstance(offloadKqv, bool)):
-            raise AttributeError("[llama_utils] Invalid `_private_offload_kqv`.")
-    else:
-        offloadKqv = True
-        logging.info("[llama_utils] `_private_offload_kqv` not defined. Set to True.")
+    # Get offload KQV
+    offloadKqv = Configuration.get("_private_offload_kqv", True)
     
-    # Get offload_op
-    if ("_private_offload_op" in Configuration):
-        offloadOp = Configuration["_private_offload_op"]
+    # Get offload op
+    offloadOp = Configuration.get("_private_offload_op", None)
 
-        if (not isinstance(offloadOp, bool) and offloadOp is not None):
-            raise AttributeError("[llama_utils] Invalid `_private_offload_op`.")
-    else:
-        offloadOp = None
-        logging.info("[llama_utils] `_private_offload_op` not defined. Set to None.")
+    # Get attn type
+    attn = Configuration.get("_private_attn", None)
+    attn = StringToAttnType(attn)
     
-    # Get flash_attn
-    if ("_private_flash_attn" in Configuration):
-        flashAttn = Configuration["_private_flash_attn"]
-
-        if (not isinstance(flashAttn, bool)):
-            raise AttributeError("[llama_utils] Invalid `_private_flash_attn`.")
-    else:
-        flashAttn = False
-        logging.info("[llama_utils] `_private_flash_attn` not defined. Set to False.")
+    # Get flash attn type
+    flashAttn = Configuration.get("_private_flash_attn", None)
+    flashAttn = StringToFlashAttnType(flashAttn)
     
-    # Get swa_full
-    if ("_private_swa_full" in Configuration):
-        swaFull = Configuration["_private_swa_full"]
-
-        if (not isinstance(swaFull, bool) and swaFull is not None):
-            raise AttributeError("[llama_utils] Invalid `_private_swa_full`.")
-    else:
-        swaFull = None
-        logging.info("[llama_utils] `_private_swa_full` not defined. Set to None.")
+    # Get swa full
+    swaFull = Configuration.get("_private_swa_full", None)
     
-    # Set ftype_k
-    if ("ftype_k" in Configuration):
-        ftypeK = Configuration["ftype_k"]
+    # Get FType K
+    ftypeK = Configuration.get("ftype_k", None)
+    ftypeK = StringToFtype(ftypeK)
 
-        if (not isinstance(ftypeK, str)):
-            raise AttributeError("[llama_utils] Invalid `ftype_k`.")
-        
-        ftypeK = StringToFtype(ftypeK)
-
-        if (ftypeK is None or ftypeK not in [
-            llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
-            llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
-            llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
-            llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
-        ]):
-            ftypeK = None
-            logging.warning("[llama_utils] `ftype_k` not found or invalid. Set to None.")
-    else:
+    if (ftypeK is None or ftypeK not in [
+        llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
+    ]):
         ftypeK = None
-        logging.info("[llama_utils] `ftype_k` not defined. Set to None.")
+        logging.warning("[llama_utils] `ftype_k` not found or invalid. Set to None.")
     
-    # Set ftype_v
-    if ("ftype_v" in Configuration):
-        ftypeV = Configuration["ftype_v"]
+    # Get FType V
+    ftypeV = Configuration.get("ftype_v", None)
+    ftypeV = StringToFtype(ftypeV)
 
-        if (not isinstance(ftypeV, str)):
-            raise AttributeError("[llama_utils] Invalid `ftype_v`.")
-        
-        ftypeV = StringToFtype(ftypeV)
-
-        if (ftypeV is None or ftypeV not in [
-            llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
-            llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
-            llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
-            llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
-        ]):
-            ftypeV = None
-            logging.warning("[llama_utils] `ftype_v` not found or invalid. Set to None.")
-    else:
+    if (ftypeV is None or ftypeV not in [
+        llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
+    ]):
         ftypeV = None
-        logging.info("[llama_utils] `ftype_v` not defined. Set to None.")
+        logging.warning("[llama_utils] `ftype_v` not found or invalid. Set to None.")
     
-    # Set spm_infill
-    if ("_private_spm_infill" in Configuration):
-        spmInfill = Configuration["_private_spm_infill"]
-
-        if (not isinstance(spmInfill, bool)):
-            raise AttributeError("[llama_utils] Invalid `_private_spm_infill`.")
-    else:
-        spmInfill = False
-        logging.info("[llama_utils] `_private_spm_infill` not defined. Set to False.")
+    # Get spm infill
+    spmInfill = Configuration.get("_private_spm_infill", False)
     
-    # Set cache_type
-    if ("_private_cache_type" in Configuration):
-        cacheType = Configuration["_private_cache_type"]
-
-        if (cacheType is not None):
-            if (not isinstance(cacheType, str)):
-                raise AttributeError("[llama_utils] Invalid `_private_cache_type`.")
-            
-            cacheType = StringToCacheType(cacheType)
-
-            if (cacheType is None):
-                logging.warning("[llama_utils] `_private_cache_type` not found. Set to None.")
-    else:
-        cacheType = None
-        logging.info("[llama_utils] `_private_cache_type` not defined. Set to None.")
+    # Get cache type
+    cacheType = Configuration.get("_private_cache_type", None)
+    cacheType = StringToCacheType(cacheType)
     
-    # Set multimodal type
-    if ("multimodal" in Configuration):
-        multimodal = Configuration["multimodal"]
+    # Get multimodal type
+    multimodal = Configuration.get("multimodal", "text")
 
-        if (isinstance(multimodal, str)):
-            multimodal = multimodal.split(" ")
-        elif (not isinstance(multimodal, list)):
-            multimodal = ["text"]
-    else:
+    if (isinstance(multimodal, str)):
+        multimodal = multimodal.split(" ")
+    elif (not isinstance(multimodal, list)):
         multimodal = ["text"]
-    
-    # Set cpu_moe
-    cpuMoE = Configuration["_private_cpu_moe"] if ("_private_cpu_moe" in Configuration) else False
-    nCPUMoE = Configuration["_private_n_cpu_moe"] if ("_private_n_cpu_moe" in Configuration and not cpuMoE) else 0
-    
+
     for mul in multimodal:
         if (
             mul != "text" and
@@ -758,11 +365,38 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
             logging.warning(f"[llama_utils] Multimodal type '{mul}' not supported.")
             continue
     
+    # Get cpu moe
+    cpuMoE = Configuration.get("_private_cpu_moe", False)
+    nCPUMoE = Configuration.get("_private_n_cpu_moe", 0)
+    
+    # Get keep
+    nKeep = Configuration.get("_private_n_keep", 256)
+
+    # Get KV unified
+    kvUnified = Configuration.get("_private_kv_unified", None)
+
+    # Get check tensors
+    checkTensors = Configuration.get("_private_check_tensors", False)
+
+    # Get extra bufts usage
+    useExtraBufts = Configuration.get("_private_use_extra_bufts", False)
+
+    # Get direct IO usage
+    useDirectIO = Configuration.get("_private_use_direct_io", False)
+
+    # Get numa usage
+    useNuma = Configuration.get("_private_numa", False)
+    
     # Save the parameters in a dictionary
     modelParamsLCPP = {
         "model_path": modelPath,
         "mmproj_path": mmproj,
-        "chat_handler_kwargs": chatHandlerKwargs,
+        "chat_handler_kwargs": {
+            "use_gpu": mmprojGPU,
+            "image_min_tokens": mmprojMinImageTokens,
+            "image_max_tokens": mmprojMaxImageTokens,
+            "verbose": mmprojVerbose
+        },
         "n_gpu_layers": gpuLayers,
         "cpu_moe": cpuMoE,
         "n_cpu_moe": nCPUMoE,
@@ -787,10 +421,9 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "yarn_orig_ctx": yarnOrigCtx,
         "pooling_type": poolingType,
         "logits_all": False,
-        "embedding": False,
+        "embeddings": False,
         "offload_kqv": offloadKqv,
         "op_offload": offloadOp,
-        "flash_attn": flashAttn,
         "swa_full": swaFull,
         "no_perf": False,
         "type_k": ftypeK,
@@ -800,7 +433,20 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "lora_path": loraPath,
         "lora_base": loraBase,
         "lora_scale": loraScale,
-        "verbose": verbose
+        "verbose": verbose,
+        "use_direct_io": useDirectIO,
+        "check_tensors": checkTensors,
+        "use_extra_bufts": useExtraBufts,
+        "n_keep": nKeep,
+        "ctx_type": ctxType,
+        "attention_type": attn,
+        "flash_attn_type": flashAttn,
+        "kv_unified": kvUnified,
+        "ctx_checkpoints": ctxCheckpoints,
+        "checkpoint_interval": ctxCheckpointsInterval,
+        "checkpoint_on_device": ctxCheckpointsOnDevice,
+        "numa": useNuma,
+        "draft_model": None  # TODO: Support speculative decoding
     }
 
     # Load the model
