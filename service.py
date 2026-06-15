@@ -190,7 +190,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
 
     conversation = copy.deepcopy(Conversation)
     modelConversation = []
-    replaceRoles = __models__[Name].get("replace_roles", ServiceConfiguration["replace_roles"])
+    replaceRoles = __models__[Name].get("_private_replace_roles", ServiceConfiguration["replace_roles"])
     
     for message in conversation:
         if (message["role"] == "system"):
