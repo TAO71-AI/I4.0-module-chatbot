@@ -203,7 +203,6 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     """
     # Get verbose parameters
     verbose = Configuration.get("_private_verbose", False)
-    mmprojVerbose = Configuration.get("_private_mmproj_verbose", False)
 
     # Get model path (and mmproj if provided)
     modelPathConfig = Configuration.get("_private_model_path", {})
@@ -394,8 +393,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "chat_handler_kwargs": {
             "use_gpu": mmprojGPU,
             "image_min_tokens": mmprojMinImageTokens,
-            "image_max_tokens": mmprojMaxImageTokens,
-            "verbose": mmprojVerbose
+            "image_max_tokens": mmprojMaxImageTokens
         },
         "n_gpu_layers": gpuLayers,
         "cpu_moe": cpuMoE,
