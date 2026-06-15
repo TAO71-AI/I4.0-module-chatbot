@@ -131,6 +131,10 @@ Token that will be sent to the client when the channel changes.
 
 Example: `\n` yields "\n" when any channel is changed. `{"A": "\n"}` yields "\n" when the channel "A" is changed to any other channel. `{"A": {"to": "B", "token": "\n"}}` yields "\n" when the channel "A" is changed to channel "B". `null` or an invalid dictionary will ignore this parameter.
 
+#### `replace_roles`
+
+Dictionary of roles that must be replaced. For example, `{"person": "user"}` will set the role of all the messages with the role "person" to "user".
+
 ## Model parameters
 
 TODO

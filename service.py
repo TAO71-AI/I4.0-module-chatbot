@@ -190,6 +190,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
 
     conversation = copy.deepcopy(Conversation)
     modelConversation = []
+    replaceRoles = __models__[Name].get("replace_roles", ServiceConfiguration["replace_roles"])
     
     for message in conversation:
         if (message["role"] == "system"):
@@ -229,7 +230,8 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
             
             if (txt is not None):
                 message["content"] = txt
-
+        
+        message["role"] = replaceRoles.get(message["role"], message["role"])
         modelConversation.append(message)
     
     tools = []

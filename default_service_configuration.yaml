@@ -43,6 +43,7 @@ channel_name_end_token: "\n"
 channel_default: "response"  # Recommended to set to the response channel
 channel_null_name: "thought"
 channel_change_token: null  # Example: `\n` yields "\n" when any channel is changed. `{"A": "\n"}` yields "\n" when the channel "A" is changed to any other channel. `{"A": {"to": "B", "token": "\n"}}` yields "\n" when the channel "A" is changed to channel "B"
+replace_roles: {}
 max_length:
   default: 999999
   modified_by_user: true
