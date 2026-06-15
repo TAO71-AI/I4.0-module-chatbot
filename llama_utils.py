@@ -121,7 +121,7 @@ def ClearLlamaCache(Model: Llama) -> None:
     kv = llama_get_memory(Model.ctx)
     llama_memory_seq_rm(kv, -1, -1, -1)
 
-def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any] | tuple[Any, ...], Any], Default: Any | None = None) -> tuple[Any, int] | (Any | None):
+def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any] | tuple[Any, ...], Any], Default: Any | None = None, ValueOnly: bool = True) -> tuple[Any, int] | (Any | None):
     """
     Retrieves the value associated with a key in a dictionary, where the keys can be either a single object or a list of possible keys.
 
@@ -139,29 +139,29 @@ def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any] | t
         if (isinstance(key, list)):
             # Check if the key is found
             if (Key in key):
-                return (value, list(Dictionary.keys()).index(key))
+                return value if (ValueOnly) else (value, list(Dictionary.keys()).index(key))
         elif (isinstance(key, tuple)):
             k = list(key)
 
             if (Key in k):
-                return (value, list(Dictionary.keys()).index(key))
+                return value if (ValueOnly) else (value, list(Dictionary.keys()).index(key))
         elif (Key == key):
-            return (value, list(Dictionary.keys()).index(key))
+            return value if (ValueOnly) else (value, list(Dictionary.keys()).index(key))
     
     # Key not found, return the default value
     return Default
 
 def StringToFtype(Ftype: str | None) -> int | None:
-    return __get_value_from_dictionary__(Ftype, __FTYPES__, None)[0]
+    return __get_value_from_dictionary__(Ftype, __FTYPES__, None, ValueOnly = True)
 
 def StringToSplitMode(SplitMode: str | None) -> int | None:
-    return __get_value_from_dictionary__(SplitMode, __SPLIT_MODES__, llama_split_mode.LLAMA_SPLIT_MODE_LAYER)[0]
+    return __get_value_from_dictionary__(SplitMode, __SPLIT_MODES__, llama_split_mode.LLAMA_SPLIT_MODE_LAYER, ValueOnly = True)
 
 def StringToRopeScalingType(RopeScalingType: str | None) -> int | None:
-    return __get_value_from_dictionary__(RopeScalingType, __ROPE_SCALING_TYPES__, llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED)[0]
+    return __get_value_from_dictionary__(RopeScalingType, __ROPE_SCALING_TYPES__, llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED, ValueOnly = True)
 
 def StringToPoolingType(PoolingType: str | None) -> int | None:
-    return __get_value_from_dictionary__(PoolingType, __POOLING_TYPES__, POOLING_UNSPECIFIED)[0]
+    return __get_value_from_dictionary__(PoolingType, __POOLING_TYPES__, POOLING_UNSPECIFIED, ValueOnly = True)
 
 def StringToCacheType(CacheType: str | None, CapacityInBytes: int = 2 ^ 30) -> LlamaDiskCache | LlamaRAMCache | None:
     """
@@ -183,13 +183,13 @@ def StringToCacheType(CacheType: str | None, CapacityInBytes: int = 2 ^ 30) -> L
     return None
 
 def StringToAttnType(AttnType: str | None) -> int:
-    return __get_value_from_dictionary__(AttnType, __ATTN_TYPES__, llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED)[0]
+    return __get_value_from_dictionary__(AttnType, __ATTN_TYPES__, llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED, ValueOnly = True)
 
 def StringToFlashAttnType(FlashAttnType: str | None) -> int:
-    return __get_value_from_dictionary__(FlashAttnType, __FLASH_ATTN_TYPES__, llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO)[0]
+    return __get_value_from_dictionary__(FlashAttnType, __FLASH_ATTN_TYPES__, llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO, ValueOnly = True)
 
 def StringToCtxType(CtxType: str | None) -> int:
-    return __get_value_from_dictionary__(CtxType, __CTX_TYPES__, llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT)[0]
+    return __get_value_from_dictionary__(CtxType, __CTX_TYPES__, llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT, ValueOnly = True)
 
 def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     """
