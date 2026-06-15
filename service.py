@@ -244,15 +244,16 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     toolEndToken = __models__[Name].get("tool_end_token", ServiceConfiguration["tool_end_token"])
 
     defaultChannel = Configuration.get("default_channel", None)
+    
+    if (defaultChannel is None):
+        defaultChannel = __models__[Name].get("channel_default", ServiceConfiguration["channel_default"])
+    
     channelStartToken = __models__[Name].get("channel_start_token", ServiceConfiguration["channel_start_token"])
     channelEndToken = __models__[Name].get("channel_end_token", ServiceConfiguration["channel_end_token"])
     channelNameEndToken = __models__[Name].get("channel_name_end_token", ServiceConfiguration["channel_name_end_token"])
     channelName = defaultChannel
     prevChannelName = channelName
     settingChannelName = False
-
-    if (defaultChannel is None):
-        defaultChannel = __models__[Name].get("channel_default", ServiceConfiguration["channel_default"])
 
     fullAssistantText = ""
     firstToken = True
