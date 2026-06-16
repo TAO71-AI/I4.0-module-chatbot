@@ -526,7 +526,7 @@ def __handle_channel_change__(ModelName: str, FromChannel: str, ToChannel: str) 
     token = __models__[ModelName].get("channel_change_token", ServiceConfiguration["channel_change_token"])
 
     if (token is None):
-        return
+        return ""
     
     if (isinstance(token, str)):
         return token
