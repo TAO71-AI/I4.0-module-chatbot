@@ -260,6 +260,9 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     
     # Get ubatch
     ubatch = Configuration.get("_private_ubatch", 512)
+
+    # Get n_keep
+    nKeep = Configuration.get("_private_n_keep", 256)
     
     # Get threads
     threads = Configuration.get("_private_threads", None)
@@ -407,6 +410,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "n_ctx": ctx,
         "n_batch": batch,
         "n_ubatch": ubatch,
+        "n_keep": nKeep,
         "n_threads": threads,
         "n_threads_batch": batchThreads,
         "rope_scaling_type": ropeScalingType,
