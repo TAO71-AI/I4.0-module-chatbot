@@ -384,6 +384,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                     prevChatHandlerTemplateArgs = None
         
         __models__[Name]["_private_n_inferences"] += 1
+        __models__[Name]["_private_last_sp_hash"] = lastSP
 
     parsedTools = []
     toolsType = __models__[Name].get("tool_parse_type", None)
