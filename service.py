@@ -3,9 +3,9 @@ import logging
 from typing import Any
 from collections.abc import Generator
 import re
-import base64
 import json
 import copy
+import encryption
 import EnabledModules.chatbot.llama_utils as utils_llama
 
 SERVER_VERSION_MIN: int = 170000
@@ -195,6 +195,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     conversation = copy.deepcopy(Conversation)
     modelConversation = []
     replaceRoles = __models__[Name].get("_private_replace_roles", ServiceConfiguration["replace_roles"])
+    lastSP = ""
     
     for message in conversation:
         if (message["role"] == "system"):
@@ -207,6 +208,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                 content += cont["text"]
 
             message["content"] = content
+            lastSP = encryption.HashContent(content, encryption.hashes.SHA256)
 
         if (isinstance(message["content"], list)):
             txt = None
@@ -255,6 +257,8 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     prevChannelName = channelName
     settingChannelName = False
 
+    deleteKV = __models__[Name].get("_private_delete_kv_cache", False)
+
     fullAssistantText = ""
     firstToken = True
     startToken = Configuration["start_token"]
@@ -269,6 +273,20 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
         else:
             prevChatHandlerTemplateArgs = copy.deepcopy(model.chat_handler.extra_template_arguments)
             model.chat_handler.extra_template_arguments |= Configuration["chat_template_params"]
+        
+        if (isinstance(deleteKV, int)):
+            # Delete KV cache after X number of inferences
+            deleteKV = __models__[Name]["_private_n_inferences"] >= deleteKV
+        elif (isinstance(deleteKV, str)):
+            if (deleteKV == "different_sp"):
+                # Delete KV cache if the system prompt is different
+                deleteKV = __models__[Name]["_private_last_sp_hash"] != lastSP
+        elif (not isinstance(deleteKV, bool)):
+            deleteKV = False
+
+        if (deleteKV):
+            utils_llama.ClearLlamaCache(model)
+            logging.info(f"[service_chatbot] Deleted KV cache of the model '{Name}'.")
 
         response = model.create_chat_completion(
             messages = modelConversation,
@@ -364,9 +382,8 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                 else:
                     model.chat_handler.extra_template_arguments = prevChatHandlerTemplateArgs
                     prevChatHandlerTemplateArgs = None
-            
-            if ("_private_delete_kv_cache" in __models__[Name] and __models__[Name]["_private_delete_kv_cache"]):
-                utils_llama.ClearLlamaCache(model)
+        
+        __models__[Name]["_private_n_inferences"] += 1
 
     parsedTools = []
     toolsType = __models__[Name].get("tool_parse_type", None)
@@ -476,10 +493,7 @@ def LoadModel(Name: str, Configuration: dict[str, Any]) -> None:
     logging.info("[service_chatbot] Loading model.")
 
     # Get the model type
-    if ("_private_type" in Configuration):
-        modelType = Configuration["_private_type"]
-    else:
-        modelType = None
+    modelType = Configuration.get("_private_type", None)
     
     if (not isinstance(modelType, str) or (modelType != "hf" and modelType != "lcpp")):
         modelType = None
@@ -491,36 +505,10 @@ def LoadModel(Name: str, Configuration: dict[str, Any]) -> None:
     if (modelType == "lcpp"):
         model = utils_llama.LoadLlamaModel(Configuration)
 
-    __models__[Name] = Configuration | model
-
-    # Test the inference
-    if ("_private_test_inference" in Configuration and Configuration["_private_test_inference"]):
-        logging.info("[service_chatbot] Testing inference of the model.")
-        testInferenceConversation = copy.deepcopy(ServiceConfiguration["test_inference_conversation"])
-
-        for message in testInferenceConversation:
-            if (isinstance(message["content"], str)):
-                message["content"] = [{"type": "text", "text": message["content"]}]
-            
-            for content in message["content"]:
-                if (content["type"] == "text"):
-                    continue
-
-                with open(content[content["type"]], "rb") as f:  # Content type is not `text`, so it MUST be a file path
-                    content[content["type"]] = base64.b64encode(f.read()).decode("utf-8")
-
-        response = SERVICE_INFERENCE(
-            Name,
-            ServiceConfiguration["test_inference_configuration"],
-            {"conversation": testInferenceConversation}
-        )
-        testInferenceResponse = ""
-
-        for token in response:
-            if ("text" in token):
-                testInferenceResponse += token["text"]
-        
-        logging.info(f"[service_chatbot] Test inference response for model `{Name}`:\n```markdown\n{testInferenceResponse}\n```")
+    __models__[Name] = Configuration | model | {
+        "_private_n_inferences": 0,
+        "_private_last_sp_hash": ""
+    }
 
 def __handle_channel_change__(ModelName: str, FromChannel: str, ToChannel: str) -> str:
     token = __models__[ModelName].get("channel_change_token", ServiceConfiguration["channel_change_token"])
