@@ -208,7 +208,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                 content += cont["text"]
 
             message["content"] = content
-            lastSP = encryption.HashContent(content, encryption.hashes.SHA256)
+            lastSP = encryption.HashContent(content, encryption.hashes.ParseHash("sha256"))
 
         if (isinstance(message["content"], list)):
             txt = None
