@@ -59,6 +59,7 @@ __FTYPES__: dict[str | tuple[str, ...], int] = {
     "q5_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0,
     "q4_1": llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
     "q4_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0,
+    "q2_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q2_0,
     "q1_0": llama_ftype.LLAMA_FTYPE_MOSTLY_Q1_0,
 
     "tq1_0": llama_ftype.LLAMA_FTYPE_MOSTLY_TQ1_0,
