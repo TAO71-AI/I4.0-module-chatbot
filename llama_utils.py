@@ -21,6 +21,9 @@ from llama_cpp import (
     # Context types
     llama_context_type,
 
+    # Load mode
+    llama_load_mode,
+
     # Pooling types
     LLAMA_POOLING_TYPE_CLS as POOLING_CLS,
     LLAMA_POOLING_TYPE_MEAN as POOLING_MEAN,
@@ -237,12 +240,26 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     
     # Get main GPU
     mainGPU = Configuration.get("_private_main_gpu", 0)
-    
-    # Get mmap
-    mmap = Configuration.get("_private_use_mmap", True)
-    
-    # Get mlock
-    mlock = Configuration.get("_private_use_mlock", False)
+
+    # Get load mode
+    loadMode = Configuration.get("_private_load_mode", llama_load_mode.LLAMA_LOAD_MODE_AUTO)
+    mmap = Configuration.get("_private_use_mmap", True) or "mmap" in loadMode
+    mlock = Configuration.get("_private_use_mlock", False) or "mlock" in loadMode
+    useDirectIO = Configuration.get("_private_use_direct_io", False) or "direct_io" in loadMode
+
+    if (mmap):
+        if (mlock):
+            loadMode = llama_load_mode.LLAMA_LOAD_MODE_MMAP_MLOCK
+        else:
+            loadMode = llama_load_mode.LLAMA_LOAD_MODE_MMAP
+    elif (mlock):
+        loadMode = llama_load_mode.LLAMA_LOAD_MODE_MLOCK
+    elif (useDirectIO):
+        loadMode = llama_load_mode.LLAMA_LOAD_MODE_DIRECT_IO
+    elif (loadMode == "none"):
+        loadMode = llama_load_mode.LLAMA_LOAD_MODE_NONE
+    else:
+        loadMode = llama_load_mode.LLAMA_LOAD_MODE_AUTO
     
     # Get ctx
     ctx = Configuration.get("ctx", 2048)
@@ -359,12 +376,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         multimodal = ["text"]
 
     for mul in multimodal:
-        if (
-            mul != "text" and
-            mul != "image" and
-            mul != "video" and
-            mul != "audio"
-        ):
+        if (mul not in ["text", "image", "audio", "video"]):
             logging.warning(f"[llama_utils] Multimodal type '{mul}' not supported.")
             continue
     
@@ -384,11 +396,11 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     # Get extra bufts usage
     useExtraBufts = Configuration.get("_private_use_extra_bufts", False)
 
-    # Get direct IO usage
-    useDirectIO = Configuration.get("_private_use_direct_io", False)
-
     # Get numa usage
     useNuma = Configuration.get("_private_numa", False)
+
+    # Get load MTP
+    loadMTP = Configuration.get("_private_load_mtp", False)
     
     # Save the parameters in a dictionary
     modelParamsLCPP = {
@@ -405,8 +417,6 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "split_mode": splitMode,
         "main_gpu": mainGPU,
         "vocab_only": False,
-        "use_mmap": mmap,
-        "use_mlock": mlock,
         "seed": -1,
         "n_ctx": ctx,
         "n_batch": batch,
@@ -437,7 +447,6 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "lora_base": loraBase,
         "lora_scale": loraScale,
         "verbose": verbose,
-        "use_direct_io": useDirectIO,
         "check_tensors": checkTensors,
         "use_extra_bufts": useExtraBufts,
         "n_keep": nKeep,
@@ -449,7 +458,9 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "checkpoint_interval": ctxCheckpointsInterval,
         "checkpoint_on_device": ctxCheckpointsOnDevice,
         "numa": useNuma,
-        "draft_model": None  # TODO: Support speculative decoding
+        "load_mode": loadMode,
+        "no_alloc": False,
+        "load_mtp": loadMTP
     }
 
     # Load the model
