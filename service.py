@@ -181,6 +181,16 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
     for token in generator:
         yield token
 
+def SERVICE_STOP_INFERENCE(Name: str) -> None:
+    """
+    Stops the inference for a model.
+    """
+    if (Name not in __models__ or __models__[Name] is None):
+        return
+
+    if (__models__[Name]["_private_type"] == "lcpp"):
+        utils_llama.StopInference(__models__[Name]["_private_model"])
+
 def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, str]]]], Configuration: dict[str, Any]) -> Generator[dict[str, Any]]:
     """
     Inference the model.
@@ -249,7 +259,8 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     
     if (defaultChannel is None):
         defaultChannel = __models__[Name].get("channel_default", ServiceConfiguration["channel_default"])
-    
+
+    channelsTags = __models__[Name].get("channels_tags", ServiceConfiguration["channels_tags"])
     channelStartToken = __models__[Name].get("channel_start_token", ServiceConfiguration["channel_start_token"])
     channelEndToken = __models__[Name].get("channel_end_token", ServiceConfiguration["channel_end_token"])
     channelNameEndToken = __models__[Name].get("channel_name_end_token", ServiceConfiguration["channel_name_end_token"])
@@ -370,7 +381,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                 tools[currentToolIdx] += tokenText
 
             firstToken = False
-            yield {"text": tokenText, "extra": {"channel": channelName}}
+            yield {"text": tokenText, "extra": {"channel": channelName, "channel_tags": channelsTags.get(channelName, [])}}
         
         if (endToken is not None):
             yield {"text": endToken}

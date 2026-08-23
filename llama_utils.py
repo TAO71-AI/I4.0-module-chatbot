@@ -39,7 +39,7 @@ from llama_cpp import (
     llama_get_memory,
     llama_memory_seq_rm
 )
-from typing import Any
+from typing import Any, Generator
 import time
 
 __FTYPES__: dict[str | tuple[str, ...], int] = {
@@ -214,9 +214,11 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     if (isinstance(modelPathConfig, dict)):
         modelPath = modelPathConfig.get("llm", None)
         mmproj = modelPathConfig.get("mmproj", None)
+        draftModel = modelPathConfig.get("draft", None)
     else:
         modelPath = str(modelPathConfig)
         mmproj = None
+        draftModel = None
     
     # Get mmproj GPU usage
     mmprojGPU = Configuration.get("_private_mmproj_use_gpu", True)
@@ -237,6 +239,9 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     # Get split mode
     splitMode = Configuration.get("_private_split_mode", None)
     splitMode = StringToSplitMode(splitMode)
+
+    # Get tensor split
+    tensorSplit = Configuration.get("_private_tensor_split", None)
     
     # Get main GPU
     mainGPU = Configuration.get("_private_main_gpu", 0)
@@ -460,7 +465,8 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "numa": useNuma,
         "load_mode": loadMode,
         "no_alloc": False,
-        "load_mtp": loadMTP
+        "load_mtp": loadMTP,
+        "tensor_split": tensorSplit
     }
 
     # Load the model
@@ -478,3 +484,6 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "_private_model": model,
         "_private_type": "lcpp"
     }
+
+def StopInference(Model: Llama) -> None:
+    Model.abort()
