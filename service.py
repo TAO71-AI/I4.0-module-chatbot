@@ -329,10 +329,8 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
             tokenText = ""
 
             if (__models__[Name]["_private_type"] == "lcpp"):
-                if ("choices" not in token or len(token["choices"]) == 0 or "delta" not in token["choices"][0] or "content" not in token["choices"][0]["delta"]):
-                    continue
-
-            tokenText: str = token["choices"][0]["delta"]["content"]
+                tokenText = token.get("choices", [{}])[0].get("delta", {}).get("content", "")
+            
             fullAssistantText += tokenText
 
             if (settingChannelName):
@@ -344,10 +342,19 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                         yield {"text": __handle_channel_change__(Name, prevChannelName, channelName)}
                     
                     prevChannelName = channelName
+                    tokenTextBefore = tokenText[:tokenText.index(channelNameEndToken) if (channelNameEndToken is not None) else 0]
+                    tokenTextAfter = tokenText[(tokenText.index(channelNameEndToken) + len(channelNameEndToken)) if (channelNameEndToken is not None) else 0:]
+
+                    if (len(tokenTextBefore) > 0):
+                        yield {"text": tokenTextBefore}
+
+                    if (len(tokenTextAfter) > 0):
+                        tokenText = tokenTextAfter
+                    else:
+                        continue
                 else:
                     channelName += tokenText
-                
-                continue
+                    continue
 
             if (channelStartToken in tokenText):
                 textBeforeToken = tokenText[:tokenText.index(channelStartToken)]
