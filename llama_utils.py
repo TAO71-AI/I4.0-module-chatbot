@@ -4,6 +4,10 @@ from llama_cpp import (
     # Model
     Llama,
 
+    # Speculative
+    SpecConfig,
+    SpeculativeType,
+
     # Cache types
     LlamaDiskCache,
     LlamaRAMCache,
@@ -23,6 +27,7 @@ from llama_cpp import (
 
     # Load mode
     llama_load_mode,
+    llama_lazy_mode,
 
     # Pooling types
     LLAMA_POOLING_TYPE_CLS as POOLING_CLS,
@@ -42,7 +47,7 @@ from llama_cpp import (
 from typing import Any, Generator
 import time
 
-__FTYPES__: dict[str | tuple[str, ...], int] = {
+__FTYPES__ = {
     ("f32", "fp32"): llama_ftype.LLAMA_FTYPE_ALL_F32,
     "bf16": llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
     ("f16", "fp16"): llama_ftype.LLAMA_FTYPE_MOSTLY_F16,
@@ -84,13 +89,13 @@ __FTYPES__: dict[str | tuple[str, ...], int] = {
     ("mxfp4", "mxfp4_moe", "mxfp4moe"): llama_ftype.LLAMA_FTYPE_MOSTLY_MXFP4_MOE,
     "nvfp4": llama_ftype.LLAMA_FTYPE_MOSTLY_NVFP4
 }
-__SPLIT_MODES__: dict[str | tuple[str, ...], int] = {
+__SPLIT_MODES__ = {
     "layer": llama_split_mode.LLAMA_SPLIT_MODE_LAYER,
     "row": llama_split_mode.LLAMA_SPLIT_MODE_ROW,
     "tensor": llama_split_mode.LLAMA_SPLIT_MODE_TENSOR,
     "none": llama_split_mode.LLAMA_SPLIT_MODE_NONE
 }
-__ROPE_SCALING_TYPES__: dict[str | tuple[str, ...], int] = {
+__ROPE_SCALING_TYPES__ = {
     "linear": llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_LINEAR,
     "longrope": llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_LONGROPE,
     ("max_value", "max-value", "max value"): llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_MAX_VALUE,
@@ -98,7 +103,7 @@ __ROPE_SCALING_TYPES__: dict[str | tuple[str, ...], int] = {
     "unspecified": llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED,
     "yarn": llama_rope_scaling_type.LLAMA_ROPE_SCALING_TYPE_YARN
 }
-__POOLING_TYPES__: dict[str | tuple[str, ...], int] = {
+__POOLING_TYPES__ = {
     "cls": POOLING_CLS,
     "mean": POOLING_MEAN,
     "last": POOLING_LAST,
@@ -106,19 +111,38 @@ __POOLING_TYPES__: dict[str | tuple[str, ...], int] = {
     "rank": POOLING_RANK,
     "unspecified": POOLING_UNSPECIFIED
 }
-__ATTN_TYPES__: dict[str | tuple[str, ...], int] = {
+__ATTN_TYPES__ = {
     "casual": llama_attention_type.LLAMA_ATTENTION_TYPE_CAUSAL,
     ("non_casual", "non-casual", "non casual"): llama_attention_type.LLAMA_ATTENTION_TYPE_NON_CAUSAL,
     "unspecified": llama_attention_type.LLAMA_ATTENTION_TYPE_UNSPECIFIED
 }
-__FLASH_ATTN_TYPES__: dict[str | tuple[str, ...], int] = {
+__FLASH_ATTN_TYPES__ = {
     ("auto", "automatic"): llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_AUTO,
     "enabled": llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_ENABLED,
     "disabled": llama_flash_attn_type.LLAMA_FLASH_ATTN_TYPE_DISABLED
 }
-__CTX_TYPES__: dict[str, tuple[str, ...], int] = {
+__CTX_TYPES__ = {
     "default": llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT,
     "mtp": llama_context_type.LLAMA_CONTEXT_TYPE_MTP
+}
+__LAZY_MODES__ = {
+    ("yes", "on", True): llama_lazy_mode.LLAMA_LAZY_MODE_ON,
+    ("no", "off", False): llama_lazy_mode.LLAMA_LAZY_MODE_OFF,
+    ("auto", "automatic", None): llama_lazy_mode.LLAMA_LAZY_MODE_AUTO
+}
+__SPEC_TYPES__ = {
+    "count": SpeculativeType.COUNT,
+    "dflash": SpeculativeType.DRAFT_DFLASH,
+    "dspark": SpeculativeType.DRAFT_DSPARK,
+    "eagle3": SpeculativeType.DRAFT_EAGLE3,
+    "mtp": SpeculativeType.DRAFT_MTP,
+    "draft_simple": SpeculativeType.DRAFT_SIMPLE,
+    "ngram_cache": SpeculativeType.NGRAM_CACHE,
+    "ngram_map_k": SpeculativeType.NGRAM_MAP_K,
+    "ngram_map_k4v": SpeculativeType.NGRAM_MAP_K4V,
+    "ngram_mod": SpeculativeType.NGRAM_MOD,
+    "ngram_simple": SpeculativeType.NGRAM_SIMPLE,
+    "none": SpeculativeType.NONE
 }
 
 def ClearLlamaCache(Model: Llama) -> None:
@@ -195,6 +219,20 @@ def StringToFlashAttnType(FlashAttnType: str | None) -> int:
 def StringToCtxType(CtxType: str | None) -> int:
     return __get_value_from_dictionary__(CtxType, __CTX_TYPES__, llama_context_type.LLAMA_CONTEXT_TYPE_DEFAULT, ValueOnly = True)
 
+def StringToLazyMode(Mode: str | None) -> int:
+    return __get_value_from_dictionary__(Mode, __LAZY_MODES__, llama_lazy_mode.LLAMA_LAZY_MODE_AUTO, ValueOnly = True)
+
+def StringToSpecType(SpecType: str | None) -> int:
+    return __get_value_from_dictionary__(SpecType, __SPEC_TYPES__, SpeculativeType.NONE, ValueOnly = True)
+
+def CheckKVCacheFTypeIsValid(FType: int) -> bool:
+    return FType in [
+        llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
+        llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
+    ]
+
 def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     """
     Loads a llama.cpp model.
@@ -214,11 +252,11 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     if (isinstance(modelPathConfig, dict)):
         modelPath = modelPathConfig.get("llm", None)
         mmproj = modelPathConfig.get("mmproj", None)
-        draftModel = modelPathConfig.get("draft", None)
+        specDraftModel = modelPathConfig.get("draft", None)
     else:
         modelPath = str(modelPathConfig)
         mmproj = None
-        draftModel = None
+        specDraftModel = None
     
     # Get mmproj GPU usage
     mmprojGPU = Configuration.get("_private_mmproj_use_gpu", True)
@@ -247,7 +285,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     mainGPU = Configuration.get("_private_main_gpu", 0)
 
     # Get load mode
-    loadMode = Configuration.get("_private_load_mode", llama_load_mode.LLAMA_LOAD_MODE_AUTO)
+    loadMode = Configuration.get("_private_load_mode", "auto")
     mmap = Configuration.get("_private_use_mmap", True) or "mmap" in loadMode
     mlock = Configuration.get("_private_use_mlock", False) or "mlock" in loadMode
     useDirectIO = Configuration.get("_private_use_direct_io", False) or "direct_io" in loadMode
@@ -265,6 +303,10 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         loadMode = llama_load_mode.LLAMA_LOAD_MODE_NONE
     else:
         loadMode = llama_load_mode.LLAMA_LOAD_MODE_AUTO
+
+    # Get lazy mode
+    lazyMode = Configuration.get("_private_lazy_mode", "auto")
+    lazyMode = StringToLazyMode(lazyMode)
     
     # Get ctx
     ctx = Configuration.get("ctx", 2048)
@@ -343,27 +385,15 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     ftypeK = Configuration.get("ftype_k", None)
     ftypeK = StringToFtype(ftypeK)
 
-    if (ftypeK is None or ftypeK not in [
-        llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
-        llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
-        llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
-        llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
-    ]):
+    if (not CheckKVCacheFTypeIsValid(ftypeK)):
         ftypeK = None
-        logging.warning("[llama_utils] `ftype_k` not found or invalid. Set to None.")
     
     # Get FType V
     ftypeV = Configuration.get("ftype_v", None)
     ftypeV = StringToFtype(ftypeV)
 
-    if (ftypeV is None or ftypeV not in [
-        llama_ftype.LLAMA_FTYPE_ALL_F32, llama_ftype.LLAMA_FTYPE_MOSTLY_F16, llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
-        llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q4_1,
-        llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_0, llama_ftype.LLAMA_FTYPE_MOSTLY_Q5_1,
-        llama_ftype.LLAMA_FTYPE_MOSTLY_IQ4_NL
-    ]):
+    if (not CheckKVCacheFTypeIsValid(ftypeV)):
         ftypeV = None
-        logging.warning("[llama_utils] `ftype_v` not found or invalid. Set to None.")
     
     # Get spm infill
     spmInfill = Configuration.get("_private_spm_infill", False)
@@ -406,6 +436,51 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
 
     # Get load MTP
     loadMTP = Configuration.get("_private_load_mtp", False)
+
+    # Get spec config parameters
+    specType = Configuration.get("_private_spec_type", "mtp")
+    specType = StringToSpecType(specType)
+
+    specDraftNMax = Configuration.get("_private_spec_n_max", 3)
+    specDraftNMin = Configuration.get("_private_spec_n_min", 0)
+
+    specFtypeK = Configuration.get("_private_spec_ftype_k", ftypeK)
+    specFtypeV = Configuration.get("_private_spec_ftype_v", ftypeV)
+
+    if (not CheckKVCacheFTypeIsValid(specFtypeK)):
+        specFtypeK = None
+
+    if (not CheckKVCacheFTypeIsValid(specFtypeV)):
+        specFtypeV = None
+
+    specCPUMoE = Configuration.get("_private_spec_cpu_moe", cpuMoE)
+    specNCPUMoE = Configuration.get("_private_spec_n_cpu_moe", nCPUMoE)
+
+    specGPULayers = Configuration.get("_private_spec_gpu_layers", gpuLayers)
+
+    specThreads = Configuration.get("_private_spec_threads", threads)
+    specThreadsBatch = Configuration.get("_private_spec_threads_batch", batchThreads)
+
+    specExtraArgs = Configuration.get("_private_spec_extra_args", {})
+
+    # Get model extra args
+    extraArgs = Configuration.get("_private_extra_args", {})
+
+    # Create speculative config
+    specConfig = SpecConfig(
+        spec_type = specType,
+        draft_model_path = specDraftModel,
+        draft_n_max = specDraftNMax,
+        draft_n_min = specDraftNMin,
+        draft_type_k = specFtypeK,
+        draft_type_v = specFtypeV,
+        draft_cpu_moe = specCPUMoE,
+        draft_n_cpu_moe = specNCPUMoE,
+        draft_n_gpu_layers = specGPULayers,
+        draft_n_threads = specThreads,
+        draft_n_threads_batch = specThreadsBatch,
+        **specExtraArgs
+    )
     
     # Save the parameters in a dictionary
     modelParamsLCPP = {
@@ -466,7 +541,10 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "load_mode": loadMode,
         "no_alloc": False,
         "load_mtp": loadMTP,
-        "tensor_split": tensorSplit
+        "tensor_split": tensorSplit,
+        "lazy_mode": lazyMode,
+        "speculative": specConfig,
+        **extraArgs
     }
 
     # Load the model
