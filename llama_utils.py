@@ -467,20 +467,25 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     extraArgs = Configuration.get("_private_extra_args", {})
 
     # Create speculative config
-    specConfig = SpecConfig(
-        spec_type = specType,
-        draft_model_path = specDraftModel,
-        draft_n_max = specDraftNMax,
-        draft_n_min = specDraftNMin,
-        draft_type_k = specFtypeK,
-        draft_type_v = specFtypeV,
-        draft_cpu_moe = specCPUMoE,
-        draft_n_cpu_moe = specNCPUMoE,
-        draft_n_gpu_layers = specGPULayers,
-        draft_n_threads = specThreads,
-        draft_n_threads_batch = specThreadsBatch,
-        **specExtraArgs
-    )
+    ignoreSpecConfig = Configuration.get("_private_ignore_spec", False)
+
+    if (ignoreSpecConfig):
+        specConfig = None
+    else:
+        specConfig = SpecConfig(
+            spec_type = specType,
+            draft_model_path = specDraftModel,
+            draft_n_max = specDraftNMax,
+            draft_n_min = specDraftNMin,
+            draft_type_k = specFtypeK,
+            draft_type_v = specFtypeV,
+            draft_cpu_moe = specCPUMoE,
+            draft_n_cpu_moe = specNCPUMoE,
+            draft_n_gpu_layers = specGPULayers,
+            draft_n_threads = specThreads,
+            draft_n_threads_batch = specThreadsBatch,
+            **specExtraArgs
+        )
     
     # Save the parameters in a dictionary
     modelParamsLCPP = {
