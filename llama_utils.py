@@ -438,7 +438,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     loadMTP = Configuration.get("_private_load_mtp", False)
 
     # Get spec config parameters
-    specType = Configuration.get("_private_spec_type", "mtp")
+    specType = Configuration.get("_private_spec_type", "mtp" if (loadMTP) else "none")
     specType = StringToSpecType(specType)
 
     specDraftNMax = Configuration.get("_private_spec_n_max", 3)
@@ -467,7 +467,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     extraArgs = Configuration.get("_private_extra_args", {})
 
     # Create speculative config
-    ignoreSpecConfig = Configuration.get("_private_ignore_spec", False)
+    ignoreSpecConfig = Configuration.get("_private_ignore_spec", not loadMTP)
 
     if (ignoreSpecConfig):
         specConfig = None
