@@ -93,13 +93,16 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
     penaltyLastN = UserConfig["penalty_last_n"] if ("penalty_last_n" in UserConfig and ServiceConfiguration["penalty_last_n"]["modified_by_user"]) else __models__[Name]["penalty_last_n"] if ("penalty_last_n" in __models__[Name]) else ServiceConfiguration["penalty_last_n"]["default"]
     tools = UserConfig["tools"] if ("tools" in UserConfig and ServiceConfiguration["tools"]["modified_by_user"]) else []
     toolChoice = UserConfig["tool_choice"] if ("tool_choice" in UserConfig and ServiceConfiguration["tool_choice"]["modified_by_user"]) else "auto" if (len(tools) > 0) else "none"
-    maxLength = UserConfig["max_length"] if ("max_length" in UserConfig and ServiceConfiguration["max_length"]["modified_by_user"]) else __models__[Name]["max_length"] if ("max_length" in __models__[Name]) else ServiceConfiguration["max_length"]["default"]
+    userMaxLength = UserConfig["max_length"] if ("max_length" in UserConfig and ServiceConfiguration["max_length"]["modified_by_user"]) else -1
+    modelMaxLength = __models__[Name]["max_length"] if ("max_length" in __models__[Name]) else ServiceConfiguration["max_length"]["default"]
     stopTokens = UserConfig.get("stop_tokens", UserConfig.get("stop", []))
     stopTokens = [str(s) for s in stopTokens] if (isinstance(stopTokens, list)) else [str(stopTokens)]
     extraParameters = __models__[Name].get("_private_extra_parameters", {})
-    
-    if (maxLength > ServiceConfiguration["max_length"]["default"] and not ServiceConfiguration["max_length"]["allow_greater_than_default"]):
-        maxLength = ServiceConfiguration["max_length"]["default"]
+
+    if (userMaxLength <= 0 or (userMaxLength > modelMaxLength and not ServiceConfiguration["max_length"]["allow_greater_than_default"])):
+        maxLength = modelMaxLength
+    else:
+        maxLength = userMaxLength
     
     extraChatTemplateParams = __models__[Name].get("_private_chat_template_params", {})
     startToken = None
