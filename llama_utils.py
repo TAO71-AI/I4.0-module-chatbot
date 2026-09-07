@@ -286,7 +286,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
 
     # Get load mode
     loadMode = Configuration.get("_private_load_mode", "auto")
-    mmap = Configuration.get("_private_use_mmap", True) or "mmap" in loadMode
+    mmap = Configuration.get("_private_use_mmap", False) or "mmap" in loadMode
     mlock = Configuration.get("_private_use_mlock", False) or "mlock" in loadMode
     useDirectIO = Configuration.get("_private_use_direct_io", False) or "direct_io" in loadMode
 
