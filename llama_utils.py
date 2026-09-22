@@ -3,6 +3,7 @@ import logging
 from llama_cpp import (
     # Model
     Llama,
+    llama_context_p,
 
     # Speculative
     SpecConfig,
@@ -38,15 +39,12 @@ from llama_cpp import (
     LLAMA_POOLING_TYPE_UNSPECIFIED as POOLING_UNSPECIFIED,
 
     # Ftypes
-    llama_ftype,
-
-    # Other
-    llama_get_memory,
-    llama_memory_seq_rm
+    llama_ftype
 )
 from typing import Any, Generator
 import time
 
+# Create constants
 __FTYPES__ = {
     ("f32", "fp32"): llama_ftype.LLAMA_FTYPE_ALL_F32,
     "bf16": llama_ftype.LLAMA_FTYPE_MOSTLY_BF16,
@@ -145,9 +143,8 @@ __SPEC_TYPES__ = {
     "none": SpeculativeType.NONE
 }
 
-def ClearLlamaCache(Model: Llama) -> None:
-    kv = llama_get_memory(Model.ctx)
-    llama_memory_seq_rm(kv, -1, -1, -1)
+# Create variables
+#Ctxs: dict[int, dict[str, bool | llama_context_p]] = {}  # TODO
 
 def __get_value_from_dictionary__(Key: Any, Dictionary: dict[Any | list[Any] | tuple[Any, ...], Any], Default: Any | None = None, ValueOnly: bool = True) -> tuple[Any, int] | (Any | None):
     """
@@ -264,6 +261,11 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     # Get mmproj min and max tokens
     mmprojMinImageTokens = Configuration.get("mmproj_min_image_tokens", -1)
     mmprojMaxImageTokens = Configuration.get("mmproj_max_image_tokens", -1)
+
+    # Get mmproj video variables
+    mmprojVideoFFMPEGBinDir = Configuration.get("_private_mmproj_video_ffmpeg_bin_dir", None)
+    mmprojVideoIntervalMs = Configuration.get("_private_mmproj_video_interval_ms", None)
+    mmprojVideoFPS = Configuration.get("mmproj_video_target_fps", None)
     
     # Get LoRA
     loraConfig = Configuration.get("_private_lora", {})
@@ -326,6 +328,9 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     # Get ubatch
     ubatch = Configuration.get("_private_ubatch", 512)
 
+    # Get mmproj batch
+    mmprojBatch = Configuration.get("_private_mmproj_batch", 1024)
+
     # Get n_keep
     nKeep = Configuration.get("_private_n_keep", 256)
     
@@ -377,6 +382,9 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
     # Get flash attn type
     flashAttn = Configuration.get("_private_flash_attn", None)
     flashAttn = StringToFlashAttnType(flashAttn)
+
+    # Get mmproj flash attn
+    mmprojFlashAttn = Configuration.get("_private_mmproj_flash_attn", None)
     
     # Get swa full
     swaFull = Configuration.get("_private_swa_full", None)
@@ -494,7 +502,13 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "chat_handler_kwargs": {
             "use_gpu": mmprojGPU,
             "image_min_tokens": mmprojMinImageTokens,
-            "image_max_tokens": mmprojMaxImageTokens
+            "image_max_tokens": mmprojMaxImageTokens,
+            "batch_max_tokens": mmprojBatch,
+            "flash_attn": mmprojFlashAttn,
+            "video_fps_target": mmprojVideoFPS,
+            "video_timestamp_interval_ms": mmprojVideoIntervalMs,
+            "video_ffmpeg_bin_dir": mmprojVideoFFMPEGBinDir,
+            "verbose": verbose
         },
         "n_gpu_layers": gpuLayers,
         "cpu_moe": cpuMoE,
@@ -568,5 +582,12 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "_private_type": "lcpp"
     }
 
-def StopInference(Model: Llama) -> None:
+def ClearLlamaCache(Model: Llama) -> None:
+    Model.reset()
+
+def StopInference(Model: Llama, UserParameters: dict[str, Any]) -> None:
     Model.abort()
+
+def EndInference(Model: Llama, UserParameters: dict[str, Any]) -> None:
+    # Inference must be already stopped!
+    pass  # TODO: Support parallel requests?

@@ -194,6 +194,16 @@ def SERVICE_STOP_INFERENCE(Name: str) -> None:
     if (__models__[Name]["_private_type"] == "lcpp"):
         utils_llama.StopInference(__models__[Name]["_private_model"])
 
+def SERVICE_END_INFERENCE(Name: str) -> None:
+    """
+    Called after inference with a model was finishes.
+    """
+    if (Name not in __models__ or __models__[Name] is None):
+        return
+
+    if (__models__[Name]["_private_type"] == "lcpp"):
+        utils_llama.EndInference(__models__[Name]["_private_model"])
+
 def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, str]]]], Configuration: dict[str, Any]) -> Generator[dict[str, Any]]:
     """
     Inference the model.
