@@ -184,7 +184,7 @@ def SERVICE_INFERENCE(Name: str, UserConfig: dict[str, Any], UserParameters: dic
     for token in generator:
         yield token
 
-def SERVICE_STOP_INFERENCE(Name: str) -> None:
+def SERVICE_STOP_INFERENCE(Name: str, UserParameters: dict[str, Any]) -> None:
     """
     Stops the inference for a model.
     """
@@ -192,9 +192,9 @@ def SERVICE_STOP_INFERENCE(Name: str) -> None:
         return
 
     if (__models__[Name]["_private_type"] == "lcpp"):
-        utils_llama.StopInference(__models__[Name]["_private_model"])
+        utils_llama.StopInference(__models__[Name]["_private_model"], UserParameters)
 
-def SERVICE_END_INFERENCE(Name: str) -> None:
+def SERVICE_END_INFERENCE(Name: str, UserParameters: dict[str, Any]) -> None:
     """
     Called after inference with a model was finishes.
     """
@@ -202,7 +202,7 @@ def SERVICE_END_INFERENCE(Name: str) -> None:
         return
 
     if (__models__[Name]["_private_type"] == "lcpp"):
-        utils_llama.EndInference(__models__[Name]["_private_model"])
+        utils_llama.EndInference(__models__[Name]["_private_model"], UserParameters)
 
 def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, str]]]], Configuration: dict[str, Any]) -> Generator[dict[str, Any]]:
     """
