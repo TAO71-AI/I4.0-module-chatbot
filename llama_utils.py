@@ -504,7 +504,7 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
             "image_min_tokens": mmprojMinImageTokens,
             "image_max_tokens": mmprojMaxImageTokens,
             "batch_max_tokens": mmprojBatch,
-            "flash_attn": mmprojFlashAttn,
+            #"flash_attn": mmprojFlashAttn,
             "video_fps_target": mmprojVideoFPS,
             "video_timestamp_interval_ms": mmprojVideoIntervalMs,
             "video_ffmpeg_bin_dir": mmprojVideoFFMPEGBinDir,
