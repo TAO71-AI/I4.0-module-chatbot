@@ -471,6 +471,10 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
 
     specExtraArgs = Configuration.get("_private_spec_extra_args", {})
 
+    # Get RPC servers
+    rpcServers = Configuration.get("_private_rpc_servers", None)
+    rpcLocalDevices = Configuration.get("_private_rpc_local_devices", None)
+
     # Get model extra args
     extraArgs = Configuration.get("_private_extra_args", {})
 
@@ -563,6 +567,8 @@ def LoadLlamaModel(Configuration: dict[str, Any]) -> dict[str, Llama | Any]:
         "tensor_split": tensorSplit,
         "lazy_mode": lazyMode,
         "speculative": specConfig,
+        "rpc_servers": rpcServers,
+        "rpc_local_devices": rpcLocalDevices,
         **extraArgs
     }
 

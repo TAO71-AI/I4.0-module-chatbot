@@ -218,7 +218,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
     conversation = copy.deepcopy(Conversation)
     modelConversation = []
     replaceRoles = __models__[Name].get("_private_replace_roles", ServiceConfiguration["replace_roles"])
-    lastSP = ""
+    lastSP = 0
     
     for message in conversation:
         if (message["role"] == "system"):
@@ -231,7 +231,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                 content += cont["text"]
 
             message["content"] = content
-            lastSP = encryption.HashContent(content, encryption.ParseHash("sha256"))
+            lastSP = hash(content)
 
         if (isinstance(message["content"], list)):
             txt = None
@@ -247,13 +247,11 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                         txt += content["text"]
 
                 if (__models__[Name]["_private_type"] == "lcpp"):
-                    if ("image" in content["type"]):
-                        content["image"] = f"data:image;base64,{content['image']}"
-                    elif ("audio" in content["type"]):
-                        content["audio"] = f"data:audio;base64,{content['audio']}"
-                    elif ("video" in content["type"]):
-                        content["video"] = f"data:video;base64,{content['video']}"
-                    elif ("text" not in content["type"]):
+                    if (["image", "audio", "video"] in content["type"]):
+                        content[content["type"]] = f"data:image;base64,{content[content['type']]}"
+                    elif (content["type"] == "text"):
+                        pass
+                    else:
                         yield {"warnings": ["Unsupported media type, will be ignored."]}
                         continue
             
@@ -415,7 +413,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                     prevChatHandlerTemplateArgs = None
         
         __models__[Name]["_private_n_inferences"] += 1
-        __models__[Name]["_private_last_sp_hash"] = lastSP
+        __models__[Name]["_private_last_sp_hash"] = hash(lastSP)
 
     parsedTools = []
     toolsType = __models__[Name].get("tool_parse_type", None)
@@ -535,11 +533,13 @@ def LoadModel(Name: str, Configuration: dict[str, Any]) -> None:
     
     # Load the model
     if (modelType == "lcpp"):
-        model = utils_llama.LoadLlamaModel(Configuration)
+        model = utils_llama.LoadLlamaModel(Configuration | {
+            "_private_rpc_servers": Configuration.get("_private_rpc_servers", ServiceConfiguration.get("rpc_servers", None))
+        })
 
     __models__[Name] = Configuration | model | {
         "_private_n_inferences": 0,
-        "_private_last_sp_hash": ""
+        "_private_last_sp_hash": 0
     }
 
 def __handle_channel_change__(ModelName: str, FromChannel: str, ToChannel: str) -> str:
