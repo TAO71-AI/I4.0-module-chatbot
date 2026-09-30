@@ -53,3 +53,4 @@ max_length:
   modified_by_user: true
   allow_greater_than_default: false
 allow_assistant_prefill: false
+rpc_servers: null
