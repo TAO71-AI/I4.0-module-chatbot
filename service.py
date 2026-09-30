@@ -247,7 +247,7 @@ def InferenceModel(Name: str, Conversation: list[dict[str, str | list[dict[str, 
                         txt += content["text"]
 
                 if (__models__[Name]["_private_type"] == "lcpp"):
-                    if (["image", "audio", "video"] in content["type"]):
+                    if (content["type"] in ["image", "audio", "video"]):
                         content[content["type"]] = f"data:image;base64,{content[content['type']]}"
                     elif (content["type"] == "text"):
                         pass
